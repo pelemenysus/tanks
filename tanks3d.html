@@ -1,0 +1,3230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Танковая битва 3D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1d16; font-family: "Segoe UI", system-ui, sans-serif; }
+  #game { display: block; cursor: crosshair; }
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px;
+    background: rgba(10, 12, 8, 0.82); color: #e8e6d8; z-index: 10;
+    text-align: center; user-select: none;
+  }
+  .hidden { display: none !important; }
+  .overlay h2 { font-size: 30px; color: #e8c86a; }
+  .overlay p { font-size: 16px; line-height: 1.7; color: #cfcdb8; max-width: 640px; }
+
+  /* ===== АНГАР / ДЕРЕВО РАЗВИТИЯ ===== */
+  #hangar {
+    position: absolute; inset: 0; z-index: 10; display: flex;
+    justify-content: center; align-items: flex-start; overflow: auto;
+    background: rgba(8, 10, 6, 0.88); font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  .hWrap { width: 100%; max-width: 1380px; padding: 26px 22px; display: flex; flex-direction: column; gap: 15px; }
+  .hHead { display: flex; align-items: flex-end; justify-content: space-between; }
+  .hHead h1 { font-size: 36px; letter-spacing: 3px; color: #b7d67c; text-shadow: 0 2px 0 #4a5c2a; }
+  #hMoney { font-size: 20px; color: #ffd76e; font-weight: bold; }
+  .nationTabs { display: flex; gap: 10px; }
+  .nTab { padding: 9px 30px; font-size: 16px; cursor: pointer; background: #2c381e; color: #cfcdb8; border: 1px solid #6d8f3c; border-radius: 8px; letter-spacing: 1px; }
+  .nTab:hover { background: #3d4d28; }
+  .nTab.active { background: #6d8f3c; color: #f2f0dc; border-color: #a5c86a; }
+  .treeWrap { display: flex; gap: 12px; align-items: flex-start; justify-content: center; padding: 14px; background: rgba(12,16,8,0.75); border: 1px solid rgba(140,180,90,0.4); border-radius: 12px; overflow-x: auto; }
+  .branchCol { display: flex; flex-direction: column; gap: 8px; min-width: 148px; }
+  .branchTitle { font-size: 11px; letter-spacing: 1.5px; color: #b7d67c; text-align: center; padding: 4px 0 6px; border-bottom: 1px solid rgba(140,180,90,0.3); margin-bottom: 2px; }
+  .treeCard { width: 142px; padding: 9px 8px; border-radius: 8px; background: #1d2614; border: 2px solid #3a4a26; cursor: pointer; text-align: center; transition: border-color .12s, background .12s; }
+  .treeCard:hover { border-color: #8fce4f; }
+  .treeCard.selected { border-color: #ffd76e; background: #2c381e; }
+  .treeCard.owned { border-color: #6d8f3c; }
+  .treeCard.locked { opacity: 0.42; cursor: not-allowed; }
+  .treeCard.poor { border-color: #7a5a2a; }
+  .treeTier { font-size: 11px; color: #a9a790; letter-spacing: 1px; }
+  .treeName { font-size: 14px; font-weight: bold; color: #e8e6d0; margin: 3px 0 1px; }
+  .treeType { font-size: 11px; color: #8b8a74; }
+  .treeStats { font-size: 11px; color: #b8b59d; margin-top: 4px; line-height: 1.5; }
+  .treePrice { margin-top: 6px; font-size: 12px; font-weight: bold; color: #ffd76e; }
+  .treeCard.owned .treePrice { color: #8fce4f; }
+  .hBottom { display: flex; gap: 18px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+  .hPanel { background: rgba(12,16,8,0.75); border: 1px solid rgba(140,180,90,0.4); border-radius: 12px; padding: 18px 20px; width: 430px; color: #cfcdb8; backdrop-filter: blur(3px); }
+  .hPanel.narrow { width: 340px; }
+  .hName { font-size: 24px; font-weight: bold; color: #e8e6d0; }
+  .hType { font-size: 14px; color: #a9a790; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+  .hDesc { font-size: 14px; line-height: 1.55; color: #cfcdb8; margin-bottom: 12px; min-height: 40px; }
+  .hBuy { width: 100%; margin: 6px 0 10px; padding: 12px 0; font-size: 17px; cursor: pointer; letter-spacing: 1px; background: #54703a; color: #f2f0dc; border: 1px solid #a5c86a; border-radius: 8px; }
+  .hBuy:hover { background: #6b8a48; }
+  .hBuy:disabled { opacity: 0.45; cursor: default; }
+  .hBuy.sel { background: #3d5a2c; border-color: #9fd45f; }
+  .hStats { border-top: 1px solid rgba(140,180,90,0.25); padding-top: 10px; margin-bottom: 14px; }
+  .hRow { display: flex; justify-content: space-between; font-size: 15px; padding: 3px 0; }
+  .hRow .k { color: #a9a790; }
+  .hRow .v { color: #e8e6d0; font-weight: 600; }
+  .hNav { display: flex; gap: 10px; margin-bottom: 14px; }
+  .hBtn { flex: 1; padding: 10px 0; font-size: 15px; cursor: pointer; text-align: center; background: #46542e; color: #e8e6d0; border: 1px solid #6d8f3c; border-radius: 8px; }
+  .hBtn:hover { background: #5a6d3a; }
+  .hNavLine { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .hViewBar { display: flex; gap: 8px; }
+  .hViewBar .nTab { padding: 8px 20px; font-size: 14px; }
+  .mapBar { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mapBtn { padding: 7px 14px; font-size: 13px; cursor: pointer; background: #2c381e; color: #cfcdb8; border: 1px solid #6d8f3c; border-radius: 6px; }
+  .mapBtn:hover { background: #3d4d28; }
+  .mapBtn.active { background: #6d8f3c; color: #f2f0dc; border-color: #a5c86a; }
+  .dailyBtn { margin-left: auto; padding: 8px 18px; font-size: 14px; cursor: pointer; background: #46542e; color: #e8e6d0; border: 1px solid #a5c86a; border-radius: 8px; }
+  .dailyBtn:hover { background: #5a6d3a; }
+  .dailyBtn.ready { background: #8a6a2a; border-color: #ffd76e; color: #ffe9a8; box-shadow: 0 0 10px rgba(255,215,110,0.45); }
+  #shopView { display: flex; flex-direction: column; gap: 16px; }
+  .shopGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .shopCard { background: #1d2614; border: 2px solid #3a4a26; border-radius: 10px; padding: 12px; text-align: center; }
+  .shopCard.owned { border-color: #6d8f3c; }
+  .shopCard .scName { font-size: 16px; font-weight: bold; color: #e8e6d0; }
+  .shopCard .scType { font-size: 12px; color: #a9a790; margin: 2px 0 6px; }
+  .shopCard .scStats { font-size: 12px; color: #b8b59d; line-height: 1.5; margin-bottom: 8px; }
+  .shopCard .scPrice { font-size: 14px; font-weight: bold; color: #ffd76e; margin-bottom: 6px; }
+  .shopCard button { width: 100%; padding: 8px 0; font-size: 14px; cursor: pointer; background: #54703a; color: #f2f0dc; border: 1px solid #a5c86a; border-radius: 6px; }
+  .shopCard button:hover { background: #6b8a48; }
+  .shopCard button:disabled { opacity: 0.45; cursor: default; }
+  .premTag { display: inline-block; background: #8a6a2a; color: #ffe9a8; font-size: 10px; letter-spacing: 1px; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; }
+  .shopRoul { background: #1d2614; border: 2px solid #4a3a22; border-radius: 10px; padding: 16px 18px; text-align: center; max-width: 540px; }
+  .rTitle { font-size: 18px; font-weight: bold; color: #ffd76e; margin-bottom: 6px; }
+  .rDesc { font-size: 13px; color: #b8b59d; line-height: 1.6; margin-bottom: 8px; }
+  #mBody { max-width: 680px; max-height: 50vh; overflow: auto; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .pickBtn { padding: 10px 14px; font-size: 14px; cursor: pointer; background: #2c381e; color: #e8e6d0; border: 1px solid #6d8f3c; border-radius: 8px; }
+  .pickBtn:hover { background: #3d4d28; }
+  .modRow { border-top: 1px solid rgba(140,180,90,0.2); padding: 9px 0; }
+  .modRow:first-child { border-top: none; }
+  .modTop { display: flex; justify-content: space-between; align-items: center; }
+  .modName { font-size: 15px; font-weight: 600; color: #e8e6d0; }
+  .modLvl { font-size: 13px; color: #a9a790; }
+  .modDesc { font-size: 12px; color: #8b8a74; margin: 3px 0 6px; }
+  .modBuy { width: 100%; padding: 6px 0; font-size: 14px; cursor: pointer; background: #46542e; color: #e8e6d0; border: 1px solid #6d8f3c; border-radius: 6px; }
+  .modBuy:hover { background: #5a6d3a; }
+  .modBuy:disabled { opacity: 0.4; cursor: default; }
+  .modMax { font-size: 13px; color: #8fce4f; letter-spacing: 1px; }
+  .hRightTitle { color: #b7d67c; font-size: 17px; letter-spacing: 2px; margin-bottom: 8px; }
+  #hGo {
+    width: 100%; padding: 14px 0; font-size: 20px; cursor: pointer; letter-spacing: 2px;
+    background: #6d8f3c; color: #f2f0dc; border: 2px solid #a5c86a; border-radius: 8px;
+  }
+  #hGo:hover { background: #83a94e; }
+  #hNet {
+    width: 100%; padding: 10px 0; font-size: 15px; cursor: pointer; letter-spacing: 2px;
+    background: #3c5a8f; color: #dce8f2; border: 2px solid #6a9fc8; border-radius: 8px; margin-top: 8px;
+  }
+  #hNet:hover { background: #4a6fa8; }
+  #hNet:disabled { opacity: 0.5; cursor: wait; }
+  .hNetRow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  #hNetCfg { font-size: 11px; padding: 3px 8px; cursor: pointer; background: #33415c; color: #c8d8e8; border: 1px solid #5b7ea6; border-radius: 6px; white-space: nowrap; }
+  #hNetCfg:hover { background: #41537a; }
+  .netAddrHint { font-size: 11px; color: #8b9a8f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .netWrap { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 10px; }
+  .netDesc { font-size: 14px; line-height: 1.6; color: #b8b59d; max-width: 460px; text-align: center; }
+  #netHostInput { width: 320px; max-width: 90%; padding: 10px 12px; font-size: 15px; background: #101408; color: #e8e6d0; border: 1px solid #5b7ea6; border-radius: 6px; text-align: center; }
+  .netBtns { display: flex; gap: 10px; }
+  .netBtns .btn { margin-top: 0; padding: 8px 20px; font-size: 14px; }
+
+  .hud { position: absolute; inset: 0; pointer-events: none; z-index: 5; color: #cfccb2; font-family: "Segoe UI", system-ui, sans-serif; }
+  .hud .panel { position: absolute; }
+  #hudLeft { left: 16px; top: 16px; background: rgba(10,14,6,0.65); border: 1px solid rgba(140,180,90,0.4); border-radius: 10px; padding: 12px 14px; width: 280px; }
+  #clipTrack { margin-top: 6px; height: 12px; display: flex; gap: 5px; }
+  .clipDot { flex: 1; border-radius: 3px; background: rgba(120,120,105,0.25); border: 1px solid rgba(180,180,160,0.35); transition: background .1s; }
+  .clipDot.full { background: #ffd76e; box-shadow: 0 0 6px rgba(255,215,110,0.5); }
+  #clipLabel { font-size: 10px; letter-spacing: 1px; color: #a9a790; margin-top: 3px; }
+  #tankName { font-size: 15px; font-weight: bold; color: #b7d67c; margin-bottom: 6px; }
+  #hudLeft .lbl { font-size: 13px; font-weight: bold; letter-spacing: 1px; }
+  #hpTrack { margin-top: 7px; height: 14px; background: #243318; border-radius: 3px; overflow: hidden; }
+  #hpBar { height: 100%; width: 100%; background: #8fce4f; transition: width .12s; }
+  #cdTrack { margin-top: 6px; height: 5px; background: rgba(120,120,105,0.4); border-radius: 2px; overflow: hidden; }
+  #cdBar { height: 100%; width: 100%; background: #ffe08a; }
+  #hudRight { right: 16px; top: 16px; text-align: right; background: rgba(10,14,6,0.65); border: 1px solid rgba(140,180,90,0.4); border-radius: 10px; padding: 12px 14px; }
+  #waveText { font-size: 18px; font-weight: bold; color: #e8e6d0; }
+  #scoreText { font-size: 16px; font-weight: bold; color: #ffd76e; margin-top: 4px; }
+  #killsText { font-size: 13px; color: #b8b59d; margin-top: 2px; }
+  #minimapWrap { right: 16px; top: 118px; background: rgba(10,14,6,0.65); border: 1px solid rgba(140,180,90,0.35); border-radius: 8px; padding: 4px; }
+  canvas#minimap { display: block; width: 190px; height: 127px; }
+  #hint { left: 0; right: 0; bottom: 10px; text-align: center; font-size: 12px; color: rgba(220,220,200,0.5); }
+  .btn {
+    margin-top: 10px; padding: 14px 44px; font-size: 20px; cursor: pointer;
+    background: #6d8f3c; color: #f2f0dc; border: 2px solid #a5c86a; border-radius: 8px;
+    letter-spacing: 2px; transition: background .15s;
+  }
+  .btn:hover { background: #83a94e; }
+  .hHint { font-size: 12px; color: #8b8a74; letter-spacing: 1px; }
+  .inspectBtn { padding: 9px 18px; font-size: 15px; cursor: pointer; background: #46542e; color: #e8e6d0; border: 1px solid #6d8f3c; border-radius: 8px; letter-spacing: 1px; }
+  .inspectBtn:hover { background: #5a6d3a; }
+  #inspectBar {
+    position: absolute; left: 16px; top: 16px; z-index: 30;
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(10,14,6,0.8); border: 1px solid rgba(140,180,90,0.5);
+    border-radius: 10px; padding: 10px 14px;
+  }
+  #inspectBar button {
+    padding: 9px 16px; font-size: 14px; cursor: pointer;
+    background: #54703a; color: #f2f0dc; border: 1px solid #a5c86a; border-radius: 7px; letter-spacing: 1px;
+  }
+  #inspectBar button:hover { background: #6b8a48; }
+  #inspectBar .inspHint { font-size: 12px; color: #b8b59d; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div class="hud hidden" id="hud">
+  <div class="panel" id="hudLeft">
+    <div id="tankName">—</div>
+    <div class="lbl" id="hpText">ПРОЧНОСТЬ 100 / 100</div>
+    <div id="hpTrack"><div id="hpBar"></div></div>
+    <div id="cdTrack"><div id="cdBar"></div></div>
+    <div id="clipTrack" class="hidden"></div>
+    <div id="clipLabel"></div>
+  </div>
+  <div class="panel" id="hudRight">
+    <div id="waveText">ВОЛНА 1</div>
+    <div id="scoreText">ОЧКИ: 0</div>
+    <div id="killsText">УНИЧТОЖЕНО: 0</div>
+    <div id="alliesText">СОЮЗНИКИ: 0/0</div>
+  </div>
+  <div class="panel" id="moneyText">МОНЕТЫ: 0</div>
+  <div class="panel" id="minimapWrap"><canvas id="minimap" width="190" height="127"></canvas></div>
+  <div class="panel" id="hint">W/S — ход • A/D — поворот • мышь — башня • ЛКМ/Пробел — огонь • P — пауза • R — в ангар • M — звук</div>
+</div>
+
+<div id="hangar">
+  <div class="hWrap">
+    <div class="hHead">
+      <h1>АНГАР</h1>
+      <div class="hHint">Осмотр танка — кнопка «СМОТРЕТЬ»; зажмите ЛКМ и ведите мышью — вращение</div>
+      <button id="hInspect" class="inspectBtn">🔍 СМОТРЕТЬ</button>
+      <div id="hMoney">МОНЕТЫ: 0</div>
+    </div>
+    <div class="hNavLine">
+      <div class="hViewBar">
+        <div class="nTab active" id="viewTech">ДЕРЕВО ТЕХНИКИ</div>
+        <div class="nTab" id="viewShop">МАГАЗИН</div>
+      </div>
+      <div class="mapBar" id="mapSel"></div>
+      <button class="dailyBtn" id="dailyBtn">🎁 ЕЖЕДНЕВНАЯ НАГРАДА</button>
+    </div>
+    <div id="techView">
+      <div class="nationTabs" id="nationTabs"></div>
+      <div class="treeWrap" id="treeWrap"></div>
+    </div>
+    <div id="shopView" class="hidden">
+      <div class="shopGrid" id="shopGrid"></div>
+      <div class="shopRoul">
+        <div class="rTitle">РУЛЕТКА УДАЧИ</div>
+        <div class="rDesc">Стоимость: 500 монет. Шанс 30% выиграть сертификат на скидку 15% при покупке техники.</div>
+        <button class="modBuy" id="rouletteBtn">КРУТИТЬ — 500 МОНЕТ</button>
+        <div id="certInfo" class="rDesc"></div>
+      </div>
+    </div>
+    <div class="hBottom">
+      <div class="hPanel">
+        <div class="hName" id="hName">—</div>
+        <div class="hType" id="hType">—</div>
+        <div class="hDesc" id="hDesc">—</div>
+        <button class="hBuy" id="hBuy"></button>
+        <div class="hStats" id="hStats"></div>
+        <div class="hNav">
+          <div class="hBtn" id="hPrev">◀ УРОВЕНЬ НИЖЕ</div>
+          <div class="hBtn" id="hNext">УРОВЕНЬ ВЫШЕ ▶</div>
+        </div>
+        <button id="hGo">В БОЙ</button>
+        <button id="hNet">🌐 СЕТЕВОЙ БОЙ</button>
+        <div class="hNetRow"><button id="hNetCfg">⚙ адрес сервера</button><span id="netAddrHint" class="netAddrHint"></span></div>
+      </div>
+      <div class="hPanel narrow">
+        <div class="hRightTitle">ИССЛЕДОВАНИЯ</div>
+        <div id="hMods"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="inspectBar" class="hidden">
+  <button id="inspectBack">← В АНГАР</button>
+  <span class="inspHint">Зажмите ЛКМ и ведите мышью — вращение танка</span>
+</div>
+
+<div class="overlay hidden" id="modal">
+  <h2 id="mTitle"></h2>
+  <div id="mBody"></div>
+  <button class="btn" id="mClose">ОК</button>
+</div>
+
+<div class="overlay hidden" id="netModal">
+  <h2>🌐 АДРЕС СЕРВЕРА СЕТЕВОГО БОЯ</h2>
+  <div class="netWrap">
+    <div class="netDesc">Укажите адрес сервера (IP:порт), который запустил хозяин игры. Например: <b>185.69.125.109:8765</b>. Пусто — локальный сервер (свой компьютер).</div>
+    <input id="netHostInput" type="text" placeholder="185.69.125.109:8765" spellcheck="false">
+    <div class="netBtns">
+      <button class="btn" id="netCfgOk">СОХРАНИТЬ</button>
+      <button class="btn" id="netCfgCancel">ОТМЕНА</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="gameover">
+  <h2 id="overTitle">ПОДБИТ!</h2>
+  <p id="overStats"></p>
+  <button class="btn" id="restartBtn">В АНГАР</button>
+</div>
+
+<div class="overlay hidden" id="pause">
+  <h2>ПАУЗА</h2>
+  <p>Нажми <b>P</b>, чтобы продолжить</p>
+</div>
+
+<script src="three.min.js"></script>
+<script src="GLTFLoader.js"></script>
+<script>
+"use strict";
+
+/* ============ КОНСТАНТЫ ============ */
+let ARENA_W = 2400, ARENA_H = 1600;
+const TANK_R = 26;
+const SHELL_SPEED = 720;
+const GRAV = 550;
+const ART_FLY = 1.05;      // время полёта арт-снаряда
+const DEG = Math.PI / 180;
+
+/* ============ КАРТЫ ============ */
+const MAPS = [
+  { id: 'field', name: 'Зелёное поле', w: 3000, h: 2000,
+    sky: 0x24301c, envSkyTop: '#8fb8e8', envSkyBot: '#b8d4e8', envHor1: '#cfe2ee', envHor2: '#5a6a46', envLow: '#3d4a30',
+    ground: ['#4d5c33', 'rgba(80,100,50,0.5)', 'rgba(60,75,40,0.5)'],
+    low: 0x41582e, mid: 0x5d7840, high: 0x9aa85c, blocks: 14, crates: 10 },
+  { id: 'desert', name: 'Пустыня', w: 3600, h: 2400,
+    sky: 0x3b3226, envSkyTop: '#f0d8a8', envSkyBot: '#e8c88a', envHor1: '#efd8a8', envHor2: '#8a7a50', envLow: '#6a5c3e',
+    ground: ['#c2a86c', 'rgba(214,188,130,0.5)', 'rgba(168,140,90,0.5)'],
+    low: 0x8a7648, mid: 0xb39a62, high: 0xd8c086, blocks: 18, crates: 12 },
+  { id: 'winter', name: 'Снега', w: 3600, h: 2400,
+    sky: 0xaebcc4, envSkyTop: '#cfe0ec', envSkyBot: '#e8f0f6', envHor1: '#e8f2f8', envHor2: '#7a8a96', envLow: '#6a7680',
+    ground: ['#c8d0d8', 'rgba(220,228,236,0.5)', 'rgba(170,182,192,0.5)'],
+    low: 0x8a98a4, mid: 0xc0ccd4, high: 0xe8f0f6, blocks: 16, crates: 11 },
+  { id: 'city', name: 'Город', w: 3200, h: 2200,
+    sky: 0x2a3238, envSkyTop: '#9ab0c0', envSkyBot: '#c8d4dc', envHor1: '#c0ccd4', envHor2: '#4a5a64', envLow: '#3a444c',
+    ground: ['#5a5f52', 'rgba(96,100,90,0.5)', 'rgba(72,76,64,0.5)'],
+    low: 0x3f4a44, mid: 0x5c655c, high: 0x8a938a, blocks: 26, crates: 14 }
+];
+let mapId = 'field';
+let curMap = MAPS[0];
+
+/* ============ УТИЛИТЫ ============ */
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function angNorm(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+function angLerp(a, b, t) { return a + angNorm(b - a) * clamp(t, 0, 1); }
+function rotateToward(cur, target, maxDelta) {
+  const d = angNorm(target - cur);
+  if (Math.abs(d) <= maxDelta) return target;
+  return cur + Math.sign(d) * maxDelta;
+}
+function canvTex(w, h, draw) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  draw(c.getContext("2d"));
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  return t;
+}
+
+/* ============ ДЕРЕВО РАЗВИТИЯ: НАЦИИ, ВЕТКИ, ТЕХНИКА ============ */
+const NATIONS = { ussr: 'СССР', usa: 'США', ger: 'Германия', gb: 'Британия' };
+const NATION_ORDER = ['ussr', 'usa', 'ger', 'gb'];
+const TYPES = ['light', 'medium', 'heavy', 'td'];
+const TYPE_LABELS = { light: 'Лёгкий танк', medium: 'Средний танк', heavy: 'Тяжёлый танк', td: 'ПТ-САУ' };
+const BRANCH_TITLES = { light: 'ВЕТКА: ЛЁГКИЕ', medium: 'ВЕТКА: СРЕДНИЕ', heavy: 'ВЕТКА: ТЯЖЁЛЫЕ', td: 'ВЕТКА: ПТ-САУ' };
+const TYPE_DESCS = {
+  light: 'Быстрый и манёвренный разведчик: высокая скорость и скорострельность при слабой броне.',
+  medium: 'Универсальный средний танк: баланс огня, брони и подвижности.',
+  heavy: 'Тяжёлый танк: толстая броня и мощное орудие. Медленный, но держит удар.',
+  td: 'ПТ-САУ: тяжёлое орудие с ограниченным сектором обстрела. Засады и второй эшелон.'
+};
+const NATION_PLAYER_TINT = {
+  ussr: { hull: 0x5d7a33, top: 0x87a84f },
+  usa: { hull: 0x6e6b3a, top: 0x8f8c55 },
+  ger: { hull: 0x70707a, top: 0x9a9aa5 },
+  gb: { hull: 0x5a7146, top: 0x82986a }
+};
+const ENEMY_TINT = {
+  ussr: { hull: 0x9a5a3c, top: 0xb87a55 },
+  usa: { hull: 0x7a6a3a, top: 0x9a8a55 },
+  ger: { hull: 0x60606c, top: 0x82828f },
+  gb: { hull: 0x8a6a4a, top: 0xab8a66 }
+};
+const ALLY_TINT = { hull: 0x3f5f8a, top: 0x74a3d8 };
+const VEH_TIER_PRICES = [0, 600, 1400, 2600, 4500, 7000, 10500, 15000, 21000, 28000];
+function V(name, speed, hp, dmg, cd, turretSpeed, hullSpeed, scale, wheels, barrelLen, barrelR, extra) {
+  return Object.assign({ name, speed, hp, dmg, cd, turretSpeed, hullSpeed, scale, wheels, barrelLen, barrelR, sector: null }, extra || {});
+}
+/* Ветки-лестницы как в WoT: лёгкие/средние 1-10, тяжёлые 3-10, ПТ 2-10.
+   Тариф tier = номер машины в ветке (первая = 1). */
+const TREES = {
+  ussr: {
+    light: [
+      V('МС-1', 240, 55, 20, 0.7, 56, 60, 0.8, 4, 30, 2.0),
+      V('БТ-2', 280, 62, 22, 0.65, 60, 66, 0.82, 4, 33, 2.1),
+      V('БТ-5', 290, 70, 25, 0.62, 62, 70, 0.84, 4, 36, 2.2),
+      V('БТ-7', 300, 78, 28, 0.6, 64, 72, 0.86, 4, 38, 2.3),
+      V('А-20', 290, 88, 32, 0.62, 60, 68, 0.88, 5, 40, 2.4),
+      V('Т-50', 270, 95, 34, 0.6, 58, 66, 0.88, 5, 38, 2.4),
+      V('ЛТТБ', 260, 105, 38, 0.72, 56, 62, 0.9, 5, 40, 2.5, { cycle: true, cycleSize: 6, between: 0.8, cycleStep: 1.4 }),
+      V('Т-54 Лёгкий', 255, 115, 42, 0.68, 54, 60, 0.92, 5, 42, 2.6, { cycle: true, cycleSize: 6, between: 0.8, cycleStep: 1.35 }),
+      V('Об. 906', 250, 122, 46, 0.7, 52, 58, 0.92, 5, 44, 2.6, { cycle: true, cycleSize: 6, between: 0.75, cycleStep: 1.3 }),
+      V('Т-100 ЛТ', 245, 130, 50, 0.72, 52, 58, 0.94, 6, 44, 2.6, { cycle: true, cycleSize: 6, between: 0.75, cycleStep: 1.25 })
+    ],
+    medium: [
+      V('Т-26', 200, 60, 22, 0.7, 52, 56, 0.82, 4, 32, 2.1),
+      V('Т-28', 215, 78, 30, 0.75, 48, 55, 0.95, 5, 38, 2.4),
+      V('Т-34', 220, 95, 38, 0.78, 44, 52, 1, 5, 44, 2.6),
+      V('Т-34-85', 205, 110, 46, 0.84, 42, 50, 1, 5, 46, 2.8, { mb: true }),
+      V('Т-43', 200, 118, 50, 0.88, 40, 48, 1, 5, 46, 2.8),
+      V('Т-44', 190, 135, 56, 0.93, 38, 46, 1.02, 5, 48, 2.9, { mb: true }),
+      V('Т-54', 185, 150, 63, 1.0, 36, 44, 1.02, 5, 50, 3.0, { mb: true }),
+      V('Т-55', 182, 165, 70, 1.05, 35, 43, 1.02, 5, 50, 3.0, { mb: true }),
+      V('Т-62', 178, 178, 76, 1.1, 34, 42, 1.04, 6, 52, 3.1, { mb: true }),
+      V('Т-72', 172, 195, 84, 1.15, 33, 41, 1.05, 6, 54, 3.2, { mb: true })
+    ],
+    heavy: [
+      V('Т-35', 130, 130, 40, 1.05, 22, 26, 1.18, 6, 46, 3.0, { mb: true }),
+      V('КВ-1', 150, 150, 50, 1.15, 26, 30, 1.15, 6, 48, 3.2, { mb: true }),
+      V('КВ-85', 145, 175, 58, 1.25, 24, 28, 1.18, 6, 50, 3.3, { mb: true }),
+      V('ИС-1', 145, 180, 68, 1.3, 24, 28, 1.18, 6, 52, 3.4, { mb: true }),
+      V('ИС-2', 140, 200, 80, 1.45, 22, 27, 1.2, 6, 54, 3.6, { mb: true }),
+      V('ИС-3', 130, 210, 88, 1.6, 21, 25, 1.22, 7, 56, 3.7, { mb: true, pike: true }),
+      V('ИС-3А', 130, 215, 84, 1.45, 21, 25, 1.22, 7, 56, 3.7, { mb: true, pike: true, clip: 3, between: 0.95, clipReload: 5.2 }),
+      V('ИС-7', 125, 240, 102, 1.85, 20, 24, 1.25, 7, 58, 3.9, { mb: true, pike: true })
+    ],
+    td: [
+      V('АТ-1', 190, 62, 40, 0.95, 26, 34, 0.85, 4, 40, 2.5, { sector: 60 }),
+      V('СУ-76', 190, 75, 48, 0.9, 24, 32, 0.9, 5, 44, 2.6, { sector: 60 }),
+      V('СУ-85', 165, 105, 72, 1.55, 26, 34, 1.05, 5, 60, 3.1, { sector: 60 }),
+      V('СУ-100', 165, 130, 86, 1.65, 25, 33, 1.05, 5, 62, 3.3, { sector: 60 }),
+      V('СУ-152', 145, 155, 110, 2.0, 22, 30, 1.1, 6, 50, 4.0, { sector: 60, mb: true }),
+      V('СУ-100М1', 155, 145, 95, 1.75, 24, 32, 1.06, 5, 62, 3.3, { sector: 60 }),
+      V('ИСУ-152', 135, 185, 128, 2.2, 20, 28, 1.12, 6, 52, 4.0, { sector: 60, mb: true }),
+      V('Об. 704', 132, 205, 140, 2.3, 20, 28, 1.14, 6, 54, 4.1, { sector: 60, mb: true }),
+      V('Об. 268', 128, 220, 152, 2.4, 21, 29, 1.14, 6, 56, 4.1, { sector: 60, mb: true })
+    ]
+  },
+  usa: {
+    light: [
+      V('T1 Cunningham', 235, 50, 18, 0.7, 58, 62, 0.78, 4, 28, 1.9),
+      V('M2 Лёгкий', 270, 68, 24, 0.65, 58, 63, 0.85, 4, 34, 2.2),
+      V('M3 Стюарт', 255, 85, 29, 0.68, 52, 58, 0.9, 4, 38, 2.4),
+      V('M5A1', 245, 92, 32, 0.68, 54, 58, 0.9, 5, 38, 2.4),
+      V('M24 Чаффи', 235, 102, 36, 0.7, 50, 56, 0.92, 5, 40, 2.5),
+      V('T37', 240, 105, 38, 0.7, 52, 58, 0.92, 5, 40, 2.5),
+      V('T71', 245, 108, 40, 0.72, 52, 58, 0.93, 5, 40, 2.5),
+      V('T49', 235, 115, 44, 0.75, 50, 56, 0.94, 5, 42, 2.6),
+      V('T92E1', 230, 122, 48, 0.78, 50, 56, 0.94, 5, 42, 2.6),
+      V('M551 Шеридан', 215, 132, 52, 0.8, 52, 56, 0.95, 5, 44, 2.7)
+    ],
+    medium: [
+      V('T2 Medium', 210, 60, 22, 0.7, 52, 56, 0.84, 4, 32, 2.1),
+      V('M2 Medium', 215, 72, 26, 0.72, 50, 55, 0.9, 5, 34, 2.2),
+      V('M3 Ли', 195, 85, 34, 0.8, 42, 48, 1, 5, 40, 2.5, { sector: 60 }),
+      V('M4 Шерман', 200, 110, 42, 0.85, 42, 50, 1, 5, 44, 2.7),
+      V('M4A3E8', 195, 120, 46, 0.85, 42, 48, 1, 5, 46, 2.8, { mb: true }),
+      V('T20', 190, 130, 52, 0.9, 40, 48, 1.02, 5, 48, 2.9),
+      V('M26 Першинг', 178, 145, 58, 0.95, 38, 46, 1.05, 5, 50, 3.0, { mb: true }),
+      V('M46 Паттон', 182, 158, 64, 1.0, 37, 45, 1.05, 5, 52, 3.1, { mb: true }),
+      V('M48 Паттон', 175, 178, 72, 1.08, 35, 43, 1.1, 6, 52, 3.2, { mb: true }),
+      V('M60', 168, 195, 80, 1.15, 34, 42, 1.1, 6, 54, 3.3, { mb: true })
+    ],
+    heavy: [
+      V('T1 Heavy', 160, 120, 42, 1.0, 26, 30, 1.1, 6, 46, 3.0),
+      V('M6', 145, 150, 56, 1.15, 24, 28, 1.15, 6, 50, 3.2, { mb: true }),
+      V('T29', 132, 185, 80, 1.5, 22, 26, 1.18, 6, 56, 3.6, { mb: true }),
+      V('T32', 130, 195, 84, 1.55, 22, 26, 1.18, 6, 56, 3.6, { mb: true }),
+      V('T34', 126, 205, 90, 1.55, 21, 25, 1.2, 7, 56, 3.7, { mb: true }),
+      V('M103', 130, 225, 96, 1.7, 21, 25, 1.22, 7, 56, 3.8, { mb: true }),
+      V('T57 Heavy', 126, 230, 96, 1.4, 22, 25, 1.22, 7, 58, 3.8, { mb: true, clip: 4, between: 0.85, clipReload: 6.2 }),
+      V('T110E5', 126, 250, 108, 1.75, 21, 25, 1.23, 7, 58, 3.8, { mb: true })
+    ],
+    td: [
+      V('T18', 200, 60, 40, 0.95, 28, 36, 0.85, 4, 42, 2.5, { sector: 60 }),
+      V('M10 Волверин', 175, 90, 56, 1.3, 26, 34, 1, 5, 52, 3.0, { sector: 60 }),
+      V('M18 Хеллкэт', 200, 95, 70, 1.5, 30, 40, 1, 5, 58, 3.0, { sector: 60 }),
+      V('M36 Слаггер', 180, 110, 78, 1.6, 26, 36, 1.02, 5, 56, 3.2, { sector: 60 }),
+      V('M56 Скорпион', 210, 78, 82, 1.45, 32, 44, 0.85, 4, 54, 3.1, { sector: 60 }),
+      V('T25/2', 175, 128, 88, 1.7, 24, 32, 1.04, 5, 58, 3.2, { sector: 60 }),
+      V('T28', 135, 220, 100, 1.9, 18, 24, 1.16, 7, 56, 3.6, { sector: 60, mb: true }),
+      V('T95', 125, 250, 110, 2.0, 16, 20, 1.25, 7, 58, 3.8, { sector: 60, mb: true }),
+      V('T110E3', 128, 268, 118, 2.05, 17, 22, 1.24, 7, 60, 3.9, { sector: 60, mb: true })
+    ]
+  },
+  ger: {
+    light: [
+      V('Leichttraktor', 230, 52, 18, 0.7, 58, 62, 0.8, 4, 30, 2.0),
+      V('Pz.I', 265, 65, 23, 0.65, 60, 65, 0.85, 4, 34, 2.2),
+      V('Pz.II', 245, 82, 28, 0.68, 54, 60, 0.9, 4, 38, 2.4),
+      V('Pz.38(t)', 250, 88, 30, 0.7, 55, 62, 0.9, 4, 40, 2.5),
+      V('Pz.II Luchs', 272, 90, 28, 0.6, 62, 70, 0.9, 4, 38, 2.4),
+      V('VK 16.02', 248, 105, 38, 0.72, 55, 60, 0.95, 5, 42, 2.6),
+      V('VK 28.01', 242, 108, 40, 0.72, 54, 60, 0.95, 5, 42, 2.6),
+      V('SP I C', 240, 115, 44, 0.75, 52, 58, 0.95, 5, 44, 2.7),
+      V('HWK 30', 235, 125, 48, 0.78, 52, 58, 0.96, 5, 44, 2.7),
+      V('Ru 251', 235, 132, 52, 0.78, 54, 60, 0.96, 5, 44, 2.7)
+    ],
+    medium: [
+      V('Pz.III', 205, 100, 40, 0.78, 46, 54, 1, 5, 42, 2.6),
+      V('Pz.IV', 195, 112, 46, 0.85, 42, 50, 1, 5, 44, 2.7, { mb: true }),
+      V('Pz.IV G', 192, 118, 48, 0.85, 42, 50, 1, 5, 46, 2.7, { mb: true }),
+      V('VK 30.01 D', 188, 130, 52, 0.88, 40, 48, 1.02, 5, 48, 2.8),
+      V('Пантера', 180, 145, 60, 1.0, 36, 44, 1.08, 6, 54, 3.0, { mb: true }),
+      V('Panther II', 176, 158, 66, 1.05, 36, 44, 1.08, 6, 54, 3.1, { mb: true }),
+      V('VK 30.02 D', 172, 168, 72, 1.1, 36, 44, 1.06, 6, 54, 3.0, { mb: true }),
+      V('E-50', 170, 182, 78, 1.15, 34, 42, 1.1, 6, 56, 3.2, { mb: true }),
+      V('Leopard PT A', 205, 160, 76, 1.0, 40, 50, 1.02, 7, 54, 3.0, { mb: true }),
+      V('Leopard 1', 210, 172, 82, 1.0, 42, 52, 1.02, 7, 55, 3.0, { mb: true })
+    ],
+    heavy: [
+      V('Neubaufahrzeug', 150, 110, 38, 1.0, 22, 26, 1.12, 6, 42, 2.9, { mb: true }),
+      V('D.W.2', 145, 135, 46, 1.1, 22, 26, 1.14, 6, 46, 3.0, { mb: true }),
+      V('VK 30.01 H', 140, 155, 55, 1.2, 24, 28, 1.16, 6, 50, 3.2, { mb: true }),
+      V('VK 36.01 H', 138, 168, 62, 1.3, 24, 28, 1.18, 6, 52, 3.3, { mb: true }),
+      V('Тигр I', 138, 178, 72, 1.35, 24, 28, 1.2, 6, 54, 3.5, { mb: true }),
+      V('Тигр II', 128, 210, 86, 1.55, 22, 26, 1.22, 6, 56, 3.7, { mb: true }),
+      V('E-75', 120, 232, 96, 1.75, 20, 24, 1.26, 7, 58, 3.8, { mb: true, pike: true }),
+      V('E-100', 118, 248, 104, 1.95, 19, 23, 1.28, 7, 60, 4.0, { mb: true, pike: true })
+    ],
+    td: [
+      V('Panzerjäger I', 195, 58, 38, 0.95, 26, 34, 0.85, 4, 40, 2.5, { sector: 60 }),
+      V('StuG III', 190, 105, 55, 1.2, 24, 32, 1, 5, 46, 2.8, { sector: 60 }),
+      V('Мардер III', 205, 82, 62, 1.35, 26, 34, 0.92, 4, 48, 2.9, { sector: 60 }),
+      V('StuG III G', 185, 118, 64, 1.28, 24, 32, 1, 5, 48, 2.9, { sector: 60 }),
+      V('Jagdpanzer IV', 178, 135, 78, 1.45, 24, 32, 1.02, 5, 52, 3.1, { sector: 60 }),
+      V('Jagdpanther', 165, 168, 94, 1.65, 22, 30, 1.1, 6, 56, 3.4, { sector: 60, mb: true }),
+      V('Ferdinand', 135, 225, 108, 1.95, 18, 24, 1.2, 6, 58, 3.6, { sector: 60, mb: true }),
+      V('Jagdtiger', 130, 245, 122, 2.05, 17, 23, 1.22, 6, 60, 3.8, { sector: 60, mb: true }),
+      V('Jagdpanzer E-100', 125, 265, 132, 2.15, 17, 23, 1.24, 7, 62, 3.9, { sector: 60, mb: true })
+    ]
+  },
+  gb: {
+    light: [
+      V('Cruiser Mk. I', 235, 58, 21, 0.68, 58, 62, 0.8, 4, 30, 2.0),
+      V('Cruiser Mk. II', 270, 66, 24, 0.65, 60, 65, 0.84, 4, 34, 2.2),
+      V('Cruiser Mk. III', 255, 80, 28, 0.66, 56, 62, 0.9, 4, 38, 2.4),
+      V('Covenanter', 265, 88, 31, 0.64, 58, 66, 0.9, 4, 40, 2.5),
+      V('Crusader', 275, 95, 34, 0.62, 60, 68, 0.92, 5, 40, 2.5),
+      V('Cromwell', 280, 108, 40, 0.66, 58, 66, 0.95, 5, 44, 2.6, { mb: true }),
+      V('Comet', 265, 118, 44, 0.7, 54, 62, 0.96, 5, 46, 2.7, { mb: true }),
+      V('GSR 3301 Setter', 255, 118, 46, 0.72, 52, 60, 0.94, 5, 44, 2.7),
+      V('LHMTV', 250, 126, 50, 0.74, 54, 60, 0.95, 5, 46, 2.7),
+      V('Manticore', 245, 135, 54, 0.76, 52, 58, 0.96, 5, 46, 2.8)
+    ],
+    medium: [
+      V('Vickers Medium Mk. I', 205, 58, 20, 0.7, 52, 56, 0.84, 4, 32, 2.1),
+      V('Vickers Medium Mk. II', 210, 70, 25, 0.7, 50, 55, 0.9, 4, 36, 2.3),
+      V('Vickers Medium Mk. III', 215, 82, 31, 0.74, 48, 54, 0.95, 5, 40, 2.5),
+      V('Valentine', 190, 110, 38, 0.85, 44, 50, 1, 5, 42, 2.6),
+      V('Matilda II', 150, 155, 42, 0.95, 38, 42, 1.08, 6, 44, 2.7),
+      V('Sherman Firefly', 195, 125, 60, 1.05, 42, 48, 1.02, 5, 54, 3.0, { mb: true }),
+      V('Centurion Mk. I', 170, 150, 62, 1.0, 38, 46, 1.05, 6, 52, 3.0, { mb: true }),
+      V('Centurion Mk. 7/1', 165, 165, 68, 1.0, 37, 45, 1.05, 6, 52, 3.1, { mb: true }),
+      V('Centurion Action X', 168, 182, 76, 1.05, 36, 44, 1.06, 6, 54, 3.1, { mb: true }),
+      V('FV4202', 170, 195, 82, 1.1, 35, 43, 1.07, 6, 55, 3.2, { mb: true })
+    ],
+    heavy: [
+      V('Excelsior', 140, 165, 58, 1.2, 24, 28, 1.14, 6, 48, 3.1, { mb: true }),
+      V('Churchill I', 130, 185, 64, 1.35, 22, 26, 1.16, 6, 50, 3.2, { mb: true }),
+      V('Churchill VII', 125, 205, 70, 1.4, 21, 25, 1.18, 6, 50, 3.3, { mb: true }),
+      V('Black Prince', 120, 220, 76, 1.5, 20, 24, 1.2, 6, 52, 3.4, { mb: true }),
+      V('Caernarvon', 125, 225, 84, 1.55, 21, 25, 1.2, 6, 54, 3.5, { mb: true }),
+      V('Conqueror', 122, 235, 92, 1.65, 20, 24, 1.22, 7, 56, 3.6, { mb: true }),
+      V('Chieftain', 125, 245, 100, 1.75, 20, 24, 1.24, 7, 58, 3.8, { mb: true }),
+      V('Super Conqueror', 122, 262, 108, 1.85, 19, 23, 1.26, 7, 60, 4.0, { mb: true })
+    ],
+    td: [
+      V('Universal Carrier 2-pdr', 215, 50, 36, 0.9, 26, 36, 0.8, 4, 38, 2.4, { sector: 60 }),
+      V('Valentine AT', 185, 95, 52, 1.15, 24, 32, 1, 5, 46, 2.8, { sector: 60 }),
+      V('Archer', 205, 85, 60, 1.3, 28, 38, 0.92, 4, 48, 2.9, { sector: 60 }),
+      V('Achilles', 195, 108, 68, 1.45, 26, 36, 1, 5, 52, 3.0, { sector: 60 }),
+      V('Challenger', 185, 125, 76, 1.5, 26, 36, 1.02, 5, 54, 3.1, { sector: 60 }),
+      V('Charioteer', 190, 140, 84, 1.55, 25, 34, 1.02, 5, 56, 3.2, { sector: 60 }),
+      V('Conway', 180, 155, 92, 1.6, 24, 32, 1.05, 5, 58, 3.3, { sector: 60 }),
+      V('FV4005 Stage II', 165, 175, 110, 2.0, 20, 28, 1.12, 6, 58, 3.8, { sector: 60, mb: true }),
+      V('FV215b (183)', 160, 192, 130, 2.1, 19, 27, 1.14, 6, 58, 4.2, { sector: 60, mb: true })
+    ]
+  }
+};
+/* ============ БРОНЯ И ПРОБИТИЕ ============ */
+// броня по зонам (лоб/борт/корма) в мм
+const ARMOR = {
+  light:  { front: 45,  side: 30,  rear: 22 },
+  medium: { front: 90,  side: 60,  rear: 45 },
+  heavy:  { front: 175, side: 110, rear: 82 },
+  td:     { front: 100, side: 65,  rear: 50 }
+};
+const VEHICLES = {};
+/* пробитие: база + уровень орудия */
+const PEN = { light: 40, medium: 55, heavy: 75, td: 100 };
+const PEN_PER_TIER = { light: 4, medium: 5, heavy: 6, td: 7 };
+function vehPen(v, gunLvl) {
+  return Math.round((PEN[v.type] + v.tier * PEN_PER_TIER[v.type]) * Math.pow(1.15, gunLvl || 0));
+}
+const TIER_OFF = { light: 0, medium: 0, heavy: 2, td: 1 };
+for (const n of NATION_ORDER) for (const ty of TYPES) TREES[n][ty].forEach((v, i) => {
+  v.nation = n; v.type = ty; v.tier = i + 1 + TIER_OFF[ty]; v.id = n + '_' + ty + '_' + (i + 1);
+  v.armor = ARMOR[ty];
+  VEHICLES[v.id] = v;
+});
+/* Премиум-танки: покупаются за золото, приносят +50% монет за бой */
+const PREMIUM = [
+  { id: 'prem_ussr_is6', name: 'ИС-6', nation: 'ussr', type: 'heavy', tier: 8, gold: 600,
+    sp: [128, 260, 108, 1.55, 21, 25, 1.24, 7, 58, 3.8], extra: { mb: true } },
+  { id: 'prem_ger_lowe', name: 'Löwe', nation: 'ger', type: 'heavy', tier: 8, gold: 650,
+    sp: [130, 250, 100, 1.6, 21, 25, 1.22, 7, 56, 3.7], extra: { mb: true } },
+  { id: 'prem_usa_t34', name: 'T34', nation: 'usa', type: 'heavy', tier: 8, gold: 600,
+    sp: [128, 255, 102, 1.62, 21, 25, 1.22, 7, 56, 3.7], extra: { mb: true } },
+  { id: 'prem_usa_m4a1', name: 'M4A1 FL 10', nation: 'usa', type: 'medium', tier: 6, gold: 500,
+    sp: [185, 160, 62, 1.0, 34, 42, 1.1, 6, 50, 3.0], extra: { mb: true } },
+  { id: 'prem_gb_fv4202', name: 'FV4202 (P)', nation: 'gb', type: 'medium', tier: 8, gold: 550,
+    sp: [170, 200, 84, 1.12, 35, 43, 1.07, 6, 55, 3.2], extra: { mb: true } }
+];
+for (const p of PREMIUM) {
+  const v = V.apply(null, [p.name].concat(p.sp));
+  Object.assign(v, { id: p.id, nation: p.nation, type: p.type, tier: p.tier, premium: true, gold: p.gold, armor: ARMOR[p.type] }, p.extra);
+  VEHICLES[v.id] = v;
+}
+let selectedVeh = 'ussr_light_1';
+const nationOf = id => id.split('_')[0];
+const typeOf = id => id.split('_')[1];
+const tierOf = id => parseInt(id.split('_')[2], 10);
+// старый формат (нация_уровень) → имена для миграции
+const LEGACY_NAMES = {
+  ussr_1: 'БТ-5', ussr_2: 'Т-34', ussr_3: 'КВ-1', ussr_4: 'СУ-85', ussr_5: 'Т-34-85', ussr_6: 'ИС-1', ussr_7: 'ИС-2', ussr_8: 'ИС-7',
+  usa_1: 'M2 Лёгкий', usa_2: 'M3 Стюарт', usa_3: 'M4 Шерман', usa_4: 'M18 Хеллкэт', usa_5: 'M26 Першинг', usa_6: 'M41 Бульдог', usa_7: 'M48 Паттон', usa_8: 'M103',
+  ger_1: 'Pz.I', ger_2: 'Pz.II', ger_3: 'Pz.III', ger_4: 'Pz.IV', ger_5: 'Пантера', ger_6: 'Тигр I', ger_7: 'Тигр II', ger_8: 'E-100'
+};
+
+/* ============ ДЕНЬГИ И РАЗВИТИЕ ============ */
+const MODS = {
+  gun:    { name: 'Орудие',          desc: '+15% урон за уровень',              cost: [400, 1000, 2200] },
+  reload: { name: 'Скорострельность',desc: '-10% перезарядка за уровень',        cost: [400, 1000, 2200] },
+  armor:  { name: 'Броня',           desc: '+20 прочности за уровень',           cost: [300, 800, 1800] },
+  engine: { name: 'Двигатель',       desc: '+6% максимальная скорость за уровень',cost: [300, 800, 1800] },
+  susp:   { name: 'Подвеска',        desc: '+10% скорость поворота за уровень',  cost: [250, 700, 1500] }
+};
+function tier1Ids() {
+  const out = [];
+  for (const n of NATION_ORDER) for (const ty of TYPES) out.push(n + '_' + ty + '_1');
+  return out;
+}
+const DEF_SAVE = {
+  money: 0, gold: 0, cert: 0,
+  owned: tier1Ids(), selected: 'ussr_light_1',
+  mods: { gun: 0, reload: 0, armor: 0, engine: 0, susp: 0, reinf: 0 },
+  daily: { streak: 0, last: '' }, mapId: 'field', prem: []
+};
+let save = JSON.parse(JSON.stringify(DEF_SAVE));
+function migrateId(id) {
+  // старый формат n_t (например ussr_3) → новый id по имени танка
+  if (LEGACY_NAMES[id]) {
+    const name = LEGACY_NAMES[id];
+    for (const n of NATION_ORDER) for (const ty of TYPES) {
+      const v = TREES[n][ty].find(x => x.name === name);
+      if (v) return v.id;
+    }
+  }
+  return VEHICLES[id] ? id : null;
+}
+function loadSave() {
+  try {
+    const s = JSON.parse(localStorage.getItem('tank3d_save') || 'null');
+    if (s) {
+      save = Object.assign({}, JSON.parse(JSON.stringify(DEF_SAVE)), s, { mods: Object.assign({}, DEF_SAVE.mods, s.mods || {}) });
+      save.gold = Math.max(0, save.gold || 0);
+      save.cert = Math.max(0, save.cert || 0);
+      save.daily = Object.assign({ streak: 0, last: '' }, save.daily || {});
+      save.prem = Array.isArray(save.prem) ? save.prem : [];
+      save.mapId = MAPS.some(m => m.id === save.mapId) ? save.mapId : 'field';
+      // миграция старого формата (нация_уровень) на дерево веток
+      if (save.owned && save.owned.some(id => LEGACY_NAMES[id] || !VEHICLES[id])) {
+        const owned = [];
+        for (const id of save.owned) {
+          const nid = migrateId(id);
+          if (nid && !owned.includes(nid)) owned.push(nid);
+        }
+        save.owned = owned.length ? owned : DEF_SAVE.owned.slice();
+        const sel = migrateId(save.selected);
+        save.selected = sel || 'ussr_light_1';
+      } else if (!save.owned || !save.owned.length) {
+        save.owned = DEF_SAVE.owned.slice();
+      }
+      if (!VEHICLES[save.selected]) save.selected = 'ussr_light_1';
+      // стартовые машины всех наций (в т.ч. новых) всегда в ангаре
+      for (const id of tier1Ids()) if (!save.owned.includes(id)) save.owned.push(id);
+    }
+  } catch (e) {}
+}
+function persistSave() { try { localStorage.setItem('tank3d_save', JSON.stringify(save)); } catch (e) {} }
+function effStats(vehId) {
+  const c = VEHICLES[vehId], m = save.mods;
+  return {
+    hp: c.hp + 20 * m.armor,
+    dmg: c.dmg * Math.pow(1.15, m.gun),
+    cd: c.cd * Math.pow(0.9, m.reload),
+    speed: c.speed * Math.pow(1.06, m.engine),
+    turretSpeed: c.turretSpeed,
+    hullSpeed: c.hullSpeed * Math.pow(1.10, m.susp)
+  };
+}
+
+/* ============ SCENE ============ */
+const canvas = document.getElementById("game");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x24301c);
+scene.fog = new THREE.Fog(0x24301c, 900, 3000);
+
+// PBR-окружение: процедурное небо для металлических отражений (как в WoT)
+function makeEnv(mp) {
+  const faces = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
+  const canvases = faces.map((f, i) => {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    const g = c.getContext('2d');
+    if (f === 'py') { // небо сверху
+      const gr = g.createLinearGradient(0, 0, 0, 128);
+      gr.addColorStop(0, mp.envSkyTop); gr.addColorStop(1, mp.envSkyBot);
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    } else if (f === 'ny') { // земля снизу
+      g.fillStyle = mp.envLow; g.fillRect(0, 0, 128, 128);
+    } else { // горизонт
+      const gr = g.createLinearGradient(0, 0, 0, 128);
+      gr.addColorStop(0, mp.envHor1); gr.addColorStop(0.55, mp.envHor1); gr.addColorStop(0.6, mp.envHor2); gr.addColorStop(1, mp.envLow);
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    }
+    return c;
+  });
+  const cube = new THREE.CubeTexture(canvases);
+  cube.needsUpdate = true;
+  scene.environment = cube;
+}
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 6000);
+
+const hemi = new THREE.HemisphereLight(0xbfd7a0, 0x33402a, 0.75);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d0, 1.0);
+sun.position.set(1800, 2000, 300);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -1500; sun.shadow.camera.right = 1500;
+sun.shadow.camera.top = 1200; sun.shadow.camera.bottom = -1200;
+sun.shadow.camera.near = 200; sun.shadow.camera.far = 5000;
+sun.target.position.set(ARENA_W / 2, 0, ARENA_H / 2);
+scene.add(sun); scene.add(sun.target);
+
+const wallsGroup = new THREE.Group();
+const tanksGroup = new THREE.Group();
+const fxGroup = new THREE.Group();
+const sceneryGroup = new THREE.Group();
+scene.add(wallsGroup); scene.add(tanksGroup); scene.add(fxGroup); scene.add(sceneryGroup);
+
+function groundTextureFor(mp) {
+  const t = canvTex(1024, 1024, g => {
+    g.fillStyle = mp.ground[0]; g.fillRect(0, 0, 1024, 1024);
+    for (let i = 0; i < 260; i++) {
+      g.fillStyle = Math.random() < 0.5 ? mp.ground[1] : mp.ground[2];
+      const r = rand(14, 48);
+      g.beginPath(); g.ellipse(rand(0, 1024), rand(0, 1024), r, r * rand(0.5, 1), rand(0, 6.28), 0, 6.28); g.fill();
+    }
+    g.save(); g.translate(512, 512); g.rotate(-0.35);
+    g.fillStyle = "rgba(150,132,90,0.25)"; g.fillRect(-1200, -70, 2400, 140);
+    g.restore();
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = Math.random() < 0.5 ? "rgba(30,40,20,0.35)" : "rgba(120,130,90,0.25)";
+      g.beginPath(); g.arc(rand(0, 1024), rand(0, 1024), rand(0.8, 2.4), 0, 6.28); g.fill();
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 1.4);
+  return t;
+}
+
+const stoneTex = canvTex(256, 256, g => {
+  g.fillStyle = "#6e6a5c"; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 60; i++) {
+    g.fillStyle = Math.random() < 0.5 ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.08)";
+    g.fillRect(rand(0, 256), rand(0, 256), rand(10, 60), rand(6, 26));
+  }
+  g.strokeStyle = "rgba(0,0,0,0.35)"; g.lineWidth = 3;
+  g.strokeRect(2, 2, 252, 252);
+});
+stoneTex.wrapS = stoneTex.wrapT = THREE.RepeatWrapping;
+
+const crateTex = canvTex(256, 256, g => {
+  g.fillStyle = "#8a6a3c"; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 4; i++) {
+    g.fillStyle = i % 2 ? "#7d5f34" : "#937140";
+    g.fillRect(0, i * 64, 256, 60);
+  }
+  g.strokeStyle = "#6a4f2a"; g.lineWidth = 8; g.strokeRect(4, 4, 248, 248);
+  g.strokeStyle = "#b08a50"; g.lineWidth = 10;
+  g.beginPath(); g.moveTo(8, 8); g.lineTo(248, 248); g.moveTo(248, 8); g.lineTo(8, 248); g.stroke();
+});
+
+const flareTex = canvTex(64, 64, g => {
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, "rgba(255,240,190,1)"); gr.addColorStop(0.4, "rgba(255,170,70,0.8)"); gr.addColorStop(1, "rgba(255,120,40,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+});
+const smokeTex = canvTex(64, 64, g => {
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, "rgba(120,120,116,0.9)"); gr.addColorStop(1, "rgba(90,90,86,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+});
+
+/* Камуфляжные пятна: полупрозрачные тёмные кляксы, умножаются на цвет краски */
+const camoTex = canvTex(256, 256, g => {
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 42; i++) {
+    g.fillStyle = i % 2 ? 'rgba(120,120,115,0.30)' : 'rgba(60,60,55,0.22)';
+    const r = rand(12, 46);
+    g.beginPath();
+    g.ellipse(rand(0, 256), rand(0, 256), r, r * rand(0.45, 1), rand(0, 6.28), 0, 6.28);
+    g.fill();
+  }
+});
+
+let ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(ARENA_W, ARENA_H, 96, 64),
+  new THREE.MeshStandardMaterial({ map: groundTextureFor(MAPS[0]), roughness: 1, vertexColors: true })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(ARENA_W / 2, 0, ARENA_H / 2);
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ============ РЕЛЬЕФ ============ */
+let terrainHills = [];
+let groundHeights = null;      // сетка высот меша (97x65), строится в makeTerrain
+const GROUND_SX = 96, GROUND_SZ = 64;
+function heightAt(x, z) {
+  let h = 0;
+  for (let i = 0; i < terrainHills.length; i++) {
+    const hl = terrainHills[i];
+    const dx = x - hl.x, dz = z - hl.z;
+    const q = (dx * dx + dz * dz) / (hl.r * hl.r);
+    if (q < 9) h += hl.h * Math.exp(-q);
+  }
+  // лёгкая неровность
+  h += Math.sin(x * 0.011 + 2.1) * Math.cos(z * 0.009 + 1.3) * 3.5;
+  // плавный спуск к краям арены
+  const m = Math.min(x, z, ARENA_W - x, ARENA_H - z);
+  if (m < 190) {
+    const t = Math.max(0, m / 190);
+    h *= t * t * (3 - 2 * t);
+  }
+  // ровная площадка в центре (ангар/спавн): гасим холмы в радиусе 150
+  const dxc = x - ARENA_W / 2, dzc = z - ARENA_H / 2;
+  const qc = Math.sqrt(dxc * dxc + dzc * dzc) / 150;
+  if (qc < 1) h *= qc * qc * (3 - 2 * qc);
+  return h;
+}
+function makeTerrain(mp) {
+  mp = mp || curMap;
+  terrainHills = [];
+  if (net && net.map && net.map.hills) {
+    for (const h of net.map.hills) terrainHills.push({ x: h.x, z: h.z, r: h.r, h: h.h });
+  } else {
+  const areaF = Math.max(1, (ARENA_W * ARENA_H) / (2400 * 1600));
+  const nBig = Math.max(9, Math.round(13 * areaF));
+  const nSteep = Math.max(3, Math.round(4 * areaF));
+  for (let i = 0; i < nBig; i++) {
+    terrainHills.push({
+      x: rand(280, ARENA_W - 280),
+      z: rand(200, ARENA_H - 200),
+      r: rand(200, 460),
+      h: rand(26, 72) * (Math.random() < 0.72 ? 1 : -1)
+    });
+  }
+  for (let i = 0; i < nSteep; i++) {
+    terrainHills.push({
+      x: rand(420, ARENA_W - 420),
+      z: rand(320, ARENA_H - 320),
+      r: rand(130, 210),
+      h: rand(45, 85) * (Math.random() < 0.6 ? 1 : -1)
+    });
+  }
+  }
+  const pos = ground.geometry.attributes.position;
+  groundHeights = new Float32Array((GROUND_SX + 1) * (GROUND_SZ + 1));
+  // сетка PlaneGeometry: 97 вершин по X, 65 по Z; индексы: ix + iz*97
+  const colors = new Float32Array(pos.count * 3);
+  const cLow = new THREE.Color(mp.low), cMid = new THREE.Color(mp.mid), cHigh = new THREE.Color(mp.high);
+  for (let iz = 0; iz <= GROUND_SZ; iz++) {
+    for (let ix = 0; ix <= GROUND_SX; ix++) {
+      const i = iz * (GROUND_SX + 1) + ix;
+      const lx = pos.getX(i), ly = pos.getY(i);   // после поворота -PI/2: мир x = ARENA_W/2+lx, z = ARENA_H/2-ly
+      const mx = ARENA_W / 2 + lx, mz = ARENA_H / 2 - ly;
+      const h = heightAt(mx, mz);
+      pos.setZ(i, h);
+      groundHeights[i] = h;
+      const t = h < 25 ? 0 : h > 90 ? 1 : (h - 25) / 65;
+      const c = t < 0.5 ? cLow.clone().lerp(cMid, t * 2) : cMid.clone().lerp(cHigh, (t - 0.5) * 2);
+      colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+    }
+  }
+  pos.needsUpdate = true;
+  ground.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  ground.geometry.computeVertexNormals();
+  ground.geometry.computeBoundingSphere();
+}
+/* Точная высота меша земли (билинейная интерполяция сетки) — танки стоят по ней,
+   а не по аналитической heightAt: линейные полигоны на склонах идут ниже/выше функции. */
+function groundHeightAt(x, z) {
+  if (!groundHeights) return heightAt(x, z);
+  const gx = ARENA_W / GROUND_SX, gz = ARENA_H / GROUND_SZ;
+  let fx = x / gx, fz = z / gz;
+  fx = Math.max(0, Math.min(GROUND_SX - 1e-6, fx));
+  fz = Math.max(0, Math.min(GROUND_SZ - 1e-6, fz));
+  const ix = Math.floor(fx), iz = Math.floor(fz);
+  const tx = fx - ix, tz = fz - iz;
+  const i00 = iz * (GROUND_SX + 1) + ix;
+  const i10 = i00 + 1;
+  const i01 = i00 + (GROUND_SX + 1);
+  const i11 = i01 + 1;
+  const h00 = groundHeights[i00], h10 = groundHeights[i10];
+  const h01 = groundHeights[i01], h11 = groundHeights[i11];
+  const a = h00 + (h10 - h00) * tx;
+  const b = h01 + (h11 - h01) * tx;
+  return a + (b - a) * tz;
+}
+
+/* ============ ЗВУК ============ */
+let AC = null, soundOn = true;
+function ensureAudio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (AC && AC.state === "suspended") AC.resume();
+}
+function noiseBuffer(ac, dur) {
+  const len = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+function sfxShot(power) {
+  if (!soundOn || !AC) return;
+  const t = AC.currentTime;
+  const dur = [0.22, 0.3, 0.45][power] || 0.25;
+  const src = AC.createBufferSource(); src.buffer = noiseBuffer(AC, dur);
+  const f = AC.createBiquadFilter(); f.type = "bandpass";
+  const f0 = [900, 620, 380][power] || 800;
+  f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(150, t + dur * 0.9);
+  f.Q.value = 1.2;
+  const g = AC.createGain();
+  const vol = [0.5, 0.65, 0.85][power] || 0.55;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f).connect(g).connect(AC.destination); src.start(t);
+}
+function sfxExplode(big) {
+  if (!soundOn || !AC) return;
+  const t = AC.currentTime;
+  const src = AC.createBufferSource(); src.buffer = noiseBuffer(AC, big ? 0.7 : 0.4);
+  const f = AC.createBiquadFilter(); f.type = "lowpass";
+  f.frequency.setValueAtTime(big ? 1200 : 900, t);
+  f.frequency.exponentialRampToValueAtTime(60, t + (big ? 0.7 : 0.4));
+  const g = AC.createGain();
+  g.gain.setValueAtTime(big ? 0.9 : 0.55, t); g.gain.exponentialRampToValueAtTime(0.001, t + (big ? 0.7 : 0.4));
+  src.connect(f).connect(g).connect(AC.destination); src.start(t);
+}
+function sfxHit() {
+  if (!soundOn || !AC) return;
+  const t = AC.currentTime;
+  const o = AC.createOscillator(); o.type = "square"; o.frequency.setValueAtTime(140, t);
+  o.frequency.exponentialRampToValueAtTime(50, t + 0.12);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + 0.13);
+}
+function sfxCrate() {
+  if (!soundOn || !AC) return;
+  const t = AC.currentTime;
+  const src = AC.createBufferSource(); src.buffer = noiseBuffer(AC, 0.25);
+  const f = AC.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 500;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.4, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+  src.connect(f).connect(g).connect(AC.destination); src.start(t);
+}
+
+/* ============ МИР ============ */
+let walls = [];
+let tanks = [], bullets = [], particles = [], decals = [];
+let player = null;
+let score = 0, kills = 0, wave = 0, waveTimer = 0, sessionEarned = 0, sessionGold = 0;
+let net = null;      // сетевой бой: { ws, selfId, units:{}, bullets:{}, map:{}, wave }
+let state = "hangar";
+let camYaw = 0, hangarT = 0, shake = 0;
+const raycaster = new THREE.Raycaster();
+const aimPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const aimPoint = new THREE.Vector3();
+const flashSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: flareTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+flashSprite.visible = false;
+scene.add(flashSprite);
+let flashT = 0;
+const flashLight = new THREE.PointLight(0xffb45e, 0, 300, 2);
+scene.add(flashLight);
+
+// прицельное кольцо арты
+const aimRing = new THREE.Mesh(
+  new THREE.RingGeometry(16, 24, 36),
+  new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+);
+aimRing.rotation.x = -Math.PI / 2;
+aimRing.visible = false;
+scene.add(aimRing);
+
+function makeWalls() {
+  while (wallsGroup.children.length) wallsGroup.remove(wallsGroup.children[0]);
+  walls = [];
+  const t = 40;  const matStone = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.95 });
+  const addBox = (x, y, z, w, h, d, mat) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x + w / 2, h / 2 + heightAt(x + w / 2, z + d / 2) - 3, z + d / 2);
+    m.castShadow = true; m.receiveShadow = true;
+    wallsGroup.add(m);
+    return m;
+  };
+  if (net && net.map && net.map.walls) {
+    // сетевой бой: стены приходят с сервера (border / блоки / ящики)
+    for (const w of net.map.walls) {
+      const mat = w.crate ? new THREE.MeshStandardMaterial({ map: crateTex, roughness: 0.9 }) : matStone;
+      const hgt = w.crate ? w.w : 70;
+      walls.push({ x: w.x, y: w.y, w: w.w, h: w.h, mesh: addBox(w.x, 0, w.y, w.w, hgt, w.h, mat), mat,
+        crate: !!w.crate, hp: w.crate ? 2 : undefined, maxHp: w.crate ? 2 : undefined });
+    }
+    return;
+  }
+  const border = [
+    { x: -t, y: -t, w: ARENA_W + 2 * t, h: t }, { x: -t, y: ARENA_H, w: ARENA_W + 2 * t, h: t },
+    { x: -t, y: 0, w: t, h: ARENA_H }, { x: ARENA_W, y: 0, w: t, h: ARENA_H }
+  ];
+  for (const b of border) walls.push({ x: b.x, y: b.y, w: b.w, h: b.h, mesh: addBox(b.x, 0, b.y, b.w, 70, b.h, matStone) });
+  const blocks = [];
+  for (let i = 0; i < (curMap.blocks || 14); i++) {
+    const w = rand(140, 340), h = rand(100, 260);
+    const x = rand(120, ARENA_W - 120 - w), y = rand(120, ARENA_H - 120 - h);
+    if (x + w > ARENA_W / 2 - 200 && x < ARENA_W / 2 + 200 &&
+        y + h > ARENA_H / 2 - 200 && y < ARENA_H / 2 + 200) continue;
+    blocks.push({ x, y, w, h });
+  }
+  for (const b of blocks) walls.push({ x: b.x, y: b.y, w: b.w, h: b.h, mesh: addBox(b.x, 0, b.y, b.w, 70, b.h, matStone) });
+  for (let i = 0; i < (curMap.crates || 10); i++) {
+    const s = 52;
+    const x = rand(140, ARENA_W - 140 - s), y = rand(140, ARENA_H - 140 - s);
+    if (x + s > ARENA_W / 2 - 150 && x < ARENA_W / 2 + 150 &&
+        y + s > ARENA_H / 2 - 150 && y < ARENA_H / 2 + 150) continue;
+    const mat = new THREE.MeshStandardMaterial({ map: crateTex, roughness: 0.9 });
+    walls.push({ x, y, w: s, h: s, crate: true, hp: 2, maxHp: 2, mesh: addBox(x, 0, y, s, s, s, mat), mat });
+  }
+}
+
+function setMap(mp) {
+  curMap = mp;
+  ARENA_W = mp.w; ARENA_H = mp.h;
+  scene.background.set(mp.sky);
+  scene.fog.color.set(mp.sky);
+  makeEnv(mp);
+  ground.geometry.dispose();
+  ground.geometry = new THREE.PlaneGeometry(ARENA_W, ARENA_H, 96, 64);
+  ground.material.map = groundTextureFor(mp);
+  ground.material.needsUpdate = true;
+  makeTerrain(mp);
+  makeWalls();
+  makeScenery(mp);
+  const R = Math.max(1700, Math.max(ARENA_W, ARENA_H) / 2 + 350);
+  sun.shadow.camera.left = -R; sun.shadow.camera.right = R;
+  sun.shadow.camera.top = R; sun.shadow.camera.bottom = -R;
+  sun.shadow.camera.updateProjectionMatrix();
+}
+
+/* ============ ДЕКОРАЦИИ КАРТ ============ */
+let sceneryObjs = [];
+function clearScenery() {
+  while (sceneryGroup.children.length) sceneryGroup.remove(sceneryGroup.children[0]);
+  sceneryObjs = [];
+}
+const sceneMat = {};
+function smat(color, rough, metal) {
+  const key = color + '|' + (rough||0.85) + '|' + (metal||0);
+  if (!sceneMat[key]) sceneMat[key] = new THREE.MeshStandardMaterial({ color, roughness: rough||0.85, metalness: metal||0 });
+  return sceneMat[key];
+}
+function freeSpot(x, z, r) {
+  if (x < r + 50 || z < r + 50 || x > ARENA_W - r - 50 || z > ARENA_H - r - 50) return false;
+  if (Math.hypot(x - ARENA_W / 2, z - ARENA_H / 2) < 420) return false;
+  if (wallBlocking(x, z, r + 14)) return false;
+  return true;
+}
+function sceneryAdd(mesh, collide, r) {
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  sceneryGroup.add(mesh);
+  sceneryObjs.push(mesh);
+  if (collide) {
+    const x = mesh.position.x - r, z = mesh.position.z - r;
+    walls.push({ x, y: z, w: r * 2, h: r * 2, mesh });
+  }
+}
+function treeCanopy(x, z, s, snowy) {
+  const woodM = smat(0x5a452e, 0.9);
+  const leafM = snowy ? smat(0xd8e4ea, 0.85) : smat(0x33502a, 0.85);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(2.2 * s, 3 * s, 14 * s, 7), woodM);
+  const cy = heightAt(x, z);
+  trunk.position.set(x, cy + 7 * s, z);
+  const c1 = new THREE.Mesh(new THREE.CylinderGeometry(7.5 * s, 10 * s, 14 * s, 8), leafM);
+  c1.position.set(x, cy + 18 * s, z);
+  const c2 = new THREE.Mesh(new THREE.CylinderGeometry(5 * s, 7.5 * s, 10 * s, 8), leafM);
+  c2.position.set(x, cy + 26 * s, z);
+  const c3 = new THREE.Mesh(new THREE.CylinderGeometry(3 * s, 5 * s, 7 * s, 8), leafM);
+  c3.position.set(x, cy + 32 * s, z);
+  sceneryAdd(trunk, true, 5);
+  sceneryAdd(c1, false); sceneryAdd(c2, false); sceneryAdd(c3, false);
+}
+function bush(x, z, s, col) {
+  const b = new THREE.Mesh(new THREE.IcosahedronGeometry(6 * s, 0), smat(col, 0.9));
+  b.position.set(x, heightAt(x, z) + 3.5 * s, z);
+  b.scale.y = 0.7;
+  const b2 = new THREE.Mesh(new THREE.IcosahedronGeometry(4 * s, 0), smat(col, 0.9));
+  b2.position.set(x + 4 * s, heightAt(x, z) + 2.5 * s, z + 3 * s);
+  b2.scale.y = 0.7;
+  sceneryAdd(b, false); sceneryAdd(b2, false);
+}
+function rock(x, z, s, col) {
+  const r = new THREE.Mesh(new THREE.IcosahedronGeometry(5 * s, 0), smat(col, 0.95));
+  r.position.set(x, heightAt(x, z) + 3 * s, z);
+  r.scale.set(1, 0.7, 1);
+  r.rotation.y = rand(0, 6.28);
+  const r2 = new THREE.Mesh(new THREE.IcosahedronGeometry(3 * s, 0), smat(col, 0.95));
+  r2.position.set(x + 5 * s, heightAt(x, z) + 2 * s, z + 2 * s);
+  r2.scale.set(1, 0.7, 1);
+  sceneryAdd(r, true, 4); sceneryAdd(r2, false);
+}
+function cactus(x, z, s) {
+  const m = smat(0x4a6a3a, 0.85);
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(2.4 * s, 2.8 * s, 26 * s, 8), m);
+  c.position.set(x, heightAt(x, z) + 13 * s, z);
+  const a1 = new THREE.Mesh(new THREE.CylinderGeometry(1.4 * s, 1.6 * s, 10 * s, 6), m);
+  a1.rotation.z = Math.PI / 2;
+  a1.position.set(x + 3.5 * s, heightAt(x, z) + 16 * s, z);
+  const a2 = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * s, 1.4 * s, 8 * s, 6), m);
+  a2.rotation.z = Math.PI / 2;
+  a2.position.set(x - 3 * s, heightAt(x, z) + 12 * s, z);
+  sceneryAdd(c, false); sceneryAdd(a1, false); sceneryAdd(a2, false);
+}
+function snowMound(x, z, s) {
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(7 * s, 0), smat(0xe8f0f4, 0.9));
+  m.position.set(x, heightAt(x, z) + 2 * s, z);
+  m.scale.set(1, 0.4, 1);
+  sceneryAdd(m, false);
+}
+function grassTuft(x, z, s) {
+  const m = new THREE.Mesh(new THREE.ConeGeometry(1.6 * s, 6 * s, 5), smat(0x6a7a3a, 0.9));
+  m.position.set(x, heightAt(x, z) + 2.5 * s, z);
+  sceneryAdd(m, false);
+}
+function deadBush(x, z, s) {
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(4 * s, 0), smat(0x8a7a50, 0.95));
+  m.position.set(x, heightAt(x, z) + 2 * s, z);
+  m.scale.y = 0.6;
+  sceneryAdd(m, false);
+}
+function lamp(x, z) {
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 60, 6), smat(0x3a3a3a, 0.5, 0.6));
+  post.position.set(x, heightAt(x, z) + 30, z);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(14, 2, 2), smat(0x3a3a3a, 0.5, 0.6));
+  arm.position.set(x + 6, heightAt(x, z) + 58, z);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 4), matOf(0xf0e0b0, 0.4, 0.1));
+  head.position.set(x + 11, heightAt(x, z) + 58, z);
+  sceneryAdd(post, false); sceneryAdd(arm, false); sceneryAdd(head, false);
+}
+function barrels(x, z) {
+  for (let i = 0; i < 3; i++) {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 8, 8), smat(i % 2 ? 0x8a5a2a : 0x6a4a2a, 0.7, 0.3));
+    b.position.set(x + rand(-4, 4), heightAt(x, z) + 4, z + rand(-4, 4));
+    b.rotation.z = rand(-0.1, 0.1);
+    sceneryAdd(b, false);
+  }
+}
+function rubble(x, z) {
+  for (let i = 0; i < 5; i++) {
+    const r = new THREE.Mesh(new THREE.BoxGeometry(rand(6, 14), rand(4, 9), rand(6, 14)), smat(0x6e6a5c, 0.95));
+    r.position.set(x + rand(-8, 8), heightAt(x, z) + rand(2, 6), z + rand(-8, 8));
+    r.rotation.y = rand(0, 6.28);
+    sceneryAdd(r, false);
+  }
+}
+function makeScenery(mp) {
+  clearScenery();
+  const areaF = Math.max(1, (ARENA_W * ARENA_H) / (2400 * 1600));
+  const t = 40, W2 = ARENA_W - 40, H2 = ARENA_H - 40;
+  const trySpot = (builder, r) => {
+    for (let i = 0; i < 60; i++) {
+      const x = rand(t + 60, W2 - 60), z = rand(t + 60, H2 - 60);
+      if (freeSpot(x, z, r)) { builder(x, z); return; }
+    }
+  };
+  if (mp.id === 'city') {
+    for (let i = 0; i < Math.round(14 * areaF); i++) trySpot((x, z) => rubble(x, z), 14);
+    for (let i = 0; i < Math.round(16 * areaF); i++) trySpot((x, z) => lamp(x, z), 8);
+    for (let i = 0; i < Math.round(18 * areaF); i++) trySpot((x, z) => barrels(x, z), 10);
+    for (let i = 0; i < Math.round(10 * areaF); i++) trySpot((x, z) => bush(x, z, rand(0.8, 1.2), 0x4a5a3a), 8);
+  } else if (mp.id === 'winter') {
+    for (let i = 0; i < Math.round(30 * areaF); i++) trySpot((x, z) => treeCanopy(x, z, rand(0.9, 1.4), true), 8);
+    for (let i = 0; i < Math.round(20 * areaF); i++) trySpot((x, z) => rock(x, z, rand(0.8, 1.5), 0x8a98a4), 8);
+    for (let i = 0; i < Math.round(30 * areaF); i++) trySpot((x, z) => snowMound(x, z, rand(0.8, 1.6)), 8);
+    for (let i = 0; i < Math.round(20 * areaF); i++) trySpot((x, z) => bush(x, z, rand(0.9, 1.3), 0x9ab0b8), 6);
+  } else if (mp.id === 'desert') {
+    for (let i = 0; i < Math.round(22 * areaF); i++) trySpot((x, z) => rock(x, z, rand(0.8, 1.6), 0x9a8a62), 9);
+    for (let i = 0; i < Math.round(18 * areaF); i++) trySpot((x, z) => cactus(x, z, rand(0.8, 1.3)), 8);
+    for (let i = 0; i < Math.round(26 * areaF); i++) trySpot((x, z) => deadBush(x, z, rand(0.8, 1.4)), 8);
+    for (let i = 0; i < Math.round(12 * areaF); i++) trySpot((x, z) => bush(x, z, rand(0.8, 1.2), 0x8a7a4a), 8);
+  } else {
+    for (let i = 0; i < Math.round(26 * areaF); i++) trySpot((x, z) => treeCanopy(x, z, rand(0.9, 1.4), false), 8);
+    for (let i = 0; i < Math.round(16 * areaF); i++) trySpot((x, z) => rock(x, z, rand(0.8, 1.5), 0x7a7466), 8);
+    for (let i = 0; i < Math.round(34 * areaF); i++) trySpot((x, z) => bush(x, z, rand(0.8, 1.3), 0x43552e), 7);
+    for (let i = 0; i < Math.round(46 * areaF); i++) trySpot((x, z) => grassTuft(x, z, rand(0.7, 1.2)), 5);
+  }
+}
+
+/* ============ МОДЕЛИ ТАНКОВ ============ */
+let sharedGeo = {
+  hull: new THREE.BoxGeometry(54, 12, 28),
+  top: new THREE.BoxGeometry(44, 7, 22),
+  heavyTop: new THREE.BoxGeometry(48, 8, 24),
+  casemate: new THREE.BoxGeometry(36, 11, 20),
+  artTop: new THREE.BoxGeometry(30, 6, 18),
+  track: new THREE.BoxGeometry(64, 10, 9),
+  barrel: new THREE.CylinderGeometry(2.6, 2.6, 46, 10),
+  muzzle: new THREE.CylinderGeometry(3.6, 3.6, 6, 10),
+  turret: new THREE.CylinderGeometry(13, 15, 11, 14),
+  heavyTurret: new THREE.CylinderGeometry(15, 17, 13, 14),
+  hatch: new THREE.CylinderGeometry(5, 5, 2, 10),
+  wheel: new THREE.CylinderGeometry(4.4, 4.4, 3.4, 10),
+  bullet: new THREE.SphereGeometry(4.5, 8, 8),
+  scorch: null
+};
+function matOf(color, rough, metal) { return new THREE.MeshStandardMaterial({ color, roughness: rough || 0.8, metalness: metal || 0.08 }); }
+const markTexCache = {};
+
+/* Реалистичная параметрическая модель танка: клиновидный корпус,
+   стили башен по нациям, маски орудий, дульные тормоза, детали */
+function hullGeo(L, W, h, nose, roof) {
+  const s = new THREE.Shape();
+  s.moveTo(-L / 2, 0);
+  s.lineTo(L / 2 - nose * L, 0);
+  s.lineTo(L / 2, h * (1 - roof * 0.5));
+  s.lineTo(-L / 2, h * (1 - roof));
+  s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth: W, bevelEnabled: false });
+  g.translate(0, 0, -W / 2);
+  return g;
+}
+
+function makeTankModel(v, tint) {
+  const S = v.scale;
+  const isTD = v.type === 'td';
+  const isHeavy = v.type === 'heavy';
+  const isLight = v.type === 'light';
+  // габариты: тяжи массивные и широкие, лёгкие — компактные и низкие
+  const L = 54 * (isHeavy ? 1.09 : isLight ? 0.94 : 1) * S;
+  const W = 26 * (isHeavy ? 1.18 : isLight ? 0.9 : 1) * S;
+  const h = (isTD ? 10.5 : isHeavy ? 16.5 : isLight ? 11.5 : 13) * S;
+  const nose = v.pike ? 0.3 : isTD ? 0.28 : isLight ? 0.24 : isHeavy ? 0.2 : 0.18;
+  const roof = v.pike ? 0.22 : isTD ? 0.12 : 0.06;
+  const hullM = matOf(tint.hull, 0.62, 0.3);
+  const topM = matOf(tint.top, 0.68, 0.25);
+  hullM.map = camoTex; hullM.needsUpdate = true;
+  topM.map = camoTex; topM.needsUpdate = true;
+  const darkM = matOf(0x2b2b27, 0.85, 0.2);
+  const wheelM = matOf(0x3a3a36, 0.8, 0.25);
+  const group = new THREE.Group();
+  const wheels = [];
+  const parts = [];
+  const baseY = 6 * S;
+
+  // корпус-клин (наклонная лобовая и бортовая броня)
+  const hull = new THREE.Mesh(hullGeo(L, W, h, nose, roof), hullM);
+  hull.position.y = baseY;
+  group.add(hull); parts.push(hull);
+  // верхняя палуба
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(L * 0.72, 2 * S, W * 0.78), topM);
+  deck.position.set(-L * 0.1, baseY + h * (1 - roof * 0.5) + 0.8 * S, 0);
+  group.add(deck); parts.push(deck);
+
+  // наклонные борта (бронированные скосы) и кормовой лист
+  for (const side of [-1, 1]) {
+    const sideP = new THREE.Mesh(new THREE.BoxGeometry(L * 0.78, h * 0.95, 1.6 * S), hullM);
+    sideP.rotation.x = side * 0.3;
+    sideP.position.set(-L * 0.06, baseY + h * 0.52, side * (W / 2 - 0.4 * S));
+    group.add(sideP); parts.push(sideP);
+  }
+  const rear = new THREE.Mesh(new THREE.BoxGeometry(3 * S, h * 0.9, W * 0.9), hullM);
+  rear.rotation.z = -0.35;
+  rear.position.set(-L / 2 - 0.6 * S, baseY + h * 0.45, 0);
+  group.add(rear); parts.push(rear);
+
+  // ходовая: гусеничная лента (обвод катков с закруглениями) + катки внутри
+  const trackZ = W / 2 + 2.5 * S;
+  const trackTh = (isHeavy ? 5.6 : isLight ? 4.0 : 4.4) * S;  // ширина ленты: у тяжей толще
+  const LE = L / 2 + 1.5 * S;           // полуось ленты по X
+  const cY = 6.2 * S;                   // ось катков
+  const rL = 6.3 * S;                   // радиус обвода ленты (перед/зад)
+  const topY = cY + rL, botY = cY - rL;
+  for (const side of [-1, 1]) {
+    const sh = new THREE.Shape();
+    sh.moveTo(-LE, topY);
+    sh.lineTo(LE, topY);
+    sh.absarc(LE, cY, rL, Math.PI / 2, -Math.PI / 2, true);
+    sh.lineTo(-LE, botY);
+    sh.absarc(-LE, cY, rL, Math.PI * 1.5, Math.PI * 0.5, true);
+    const tr = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: trackTh, bevelEnabled: false }), darkM);
+    tr.position.z = side * trackZ - trackTh / 2;
+    group.add(tr); parts.push(tr);
+    // траки: рёбра на ленте
+    const ribN = Math.max(10, Math.round(L / (4.5 * S)));
+    for (let i = 0; i < ribN; i++) {
+      const x = -LE + i * (2 * LE / (ribN - 1));
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(1.5 * S, topY - botY + 0.4 * S, trackTh + 0.6 * S), wheelM);
+      rib.position.set(x, cY, side * trackZ);
+      group.add(rib); parts.push(rib);
+    }
+    // катки и опорные ролики внутри ленты
+    const span = (L - 12 * S) / Math.max(1, v.wheels - 1);
+    for (let i = 0; i < v.wheels; i++) {
+      const wh = new THREE.Mesh(sharedGeo.wheel, wheelM);
+      wh.rotation.order = 'ZYX';
+      wh.rotation.x = Math.PI / 2;
+      wh.position.set(-(L - 12 * S) / 2 + i * span, cY, side * trackZ);
+      group.add(wh); wheels.push(wh); parts.push(wh);
+    }
+    const driveR = 5.6 * S;
+    const drive = new THREE.Mesh(new THREE.CylinderGeometry(driveR, driveR, trackTh + 1 * S, 12), wheelM);
+    drive.rotation.x = Math.PI / 2;
+    drive.position.set(LE - rL + 0.5 * S, cY, side * trackZ);
+    group.add(drive); wheels.push(drive); parts.push(drive);
+    const idlerR = 4.8 * S;
+    const idler = new THREE.Mesh(new THREE.CylinderGeometry(idlerR, idlerR, trackTh + 1 * S, 12), wheelM);
+    idler.rotation.x = Math.PI / 2;
+    idler.position.set(-LE + rL - 0.5 * S, cY, side * trackZ);
+    group.add(idler); wheels.push(idler); parts.push(idler);
+    // надгусеничная полка
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(L * 0.85, 1.8 * S, trackTh + 2.6 * S), hullM);
+    guard.position.set(-L * 0.03, topY + 0.9 * S, side * trackZ);
+    group.add(guard); parts.push(guard);
+  }
+
+  // тяжи: навесные бортовые экраны + толстый лобовой лист (видимая броня)
+  if (isHeavy) {
+    for (const side of [-1, 1]) {
+      const screen = new THREE.Mesh(new THREE.BoxGeometry(L * 0.7, 5.5 * S, 1.2 * S), hullM);
+      screen.position.set(-L * 0.06, topY + 3.6 * S, side * (trackZ + trackTh / 2 + 1.4 * S));
+      group.add(screen); parts.push(screen);
+    }
+    const glacis = new THREE.Mesh(new THREE.BoxGeometry(11 * S, 9 * S, W * 0.8), hullM);
+    glacis.rotation.z = -0.55;
+    glacis.position.set(L / 2 - 4.5 * S, baseY + h * 0.85, 0);
+    group.add(glacis); parts.push(glacis);
+  }
+
+  // башня / рубка по нации и типу
+  const turretPivot = new THREE.Group();
+  turretPivot.position.y = baseY + h + (isTD ? 0.5 * S : 4.5 * S);
+  const turM = isHeavy ? 1.14 : isLight ? 0.9 : 1;
+  turretPivot.scale.set(turM, turM, turM);
+  if (isTD) {
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(4 * S, 15 * S, 15 * S), hullM);
+    plate.rotation.z = -0.6;
+    plate.position.set(10 * S, 5 * S, 0);
+    turretPivot.add(plate); parts.push(plate);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(16 * S, 4 * S, 13 * S), hullM);
+    roof.position.set(-1 * S, 2 * S, 0);
+    turretPivot.add(roof); parts.push(roof);
+  } else if (v.nation === 'ger') {
+    const tb = new THREE.Mesh(new THREE.BoxGeometry(18 * S, 8 * S, 15 * S), hullM);
+    turretPivot.add(tb); parts.push(tb);
+    const tFront = new THREE.Mesh(new THREE.BoxGeometry(6 * S, 6 * S, 13 * S), hullM);
+    tFront.rotation.z = -0.35;
+    tFront.position.set(9 * S, 2.5 * S, 0);
+    turretPivot.add(tFront); parts.push(tFront);
+    if (v.tier >= 3) {
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(3.4 * S, 3.4 * S, 3 * S, 10), topM);
+      cup.position.set(-3 * S, 5.4 * S, 4 * S);
+      turretPivot.add(cup); parts.push(cup);
+    }
+  } else if (v.nation === 'usa') {
+    const tb = new THREE.Mesh(new THREE.BoxGeometry(18 * S, 10 * S, 14 * S), hullM);
+    turretPivot.add(tb); parts.push(tb);
+    const tFront = new THREE.Mesh(new THREE.BoxGeometry(7 * S, 7 * S, 12 * S), hullM);
+    tFront.rotation.z = -0.4;
+    tFront.position.set(9.5 * S, 3 * S, 0);
+    turretPivot.add(tFront); parts.push(tFront);
+    const mg = new THREE.Mesh(new THREE.CylinderGeometry(0.7 * S, 0.7 * S, 6 * S, 6), darkM);
+    mg.rotation.z = Math.PI / 2 - 0.15;
+    mg.position.set(1 * S, 6.5 * S, 2.5 * S);
+    turretPivot.add(mg); parts.push(mg);
+    const mgBox = new THREE.Mesh(new THREE.BoxGeometry(1.6 * S, 1.3 * S, 1.6 * S), darkM);
+    mgBox.position.set(-0.5 * S, 6.1 * S, 2.5 * S);
+    turretPivot.add(mgBox); parts.push(mgBox);
+  } else if (v.nation === 'gb') {
+    const tb = new THREE.Mesh(new THREE.BoxGeometry(18 * S, 9 * S, 14 * S), hullM);
+    turretPivot.add(tb); parts.push(tb);
+    const tFront = new THREE.Mesh(new THREE.BoxGeometry(7 * S, 7 * S, 12 * S), hullM);
+    tFront.rotation.z = -0.38;
+    tFront.position.set(9.5 * S, 2.6 * S, 0);
+    turretPivot.add(tFront); parts.push(tFront);
+    // кормовая ниша башни
+    const bustle = new THREE.Mesh(new THREE.BoxGeometry(5 * S, 6 * S, 11 * S), hullM);
+    bustle.position.set(-11 * S, 1.5 * S, 0);
+    turretPivot.add(bustle); parts.push(bustle);
+    if (v.tier >= 5) {
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(2.6 * S, 2.6 * S, 2.6 * S, 10), topM);
+      cup.position.set(-4 * S, 5.6 * S, 3.5 * S);
+      turretPivot.add(cup); parts.push(cup);
+    }
+  } else {
+    const tb = new THREE.Mesh(new THREE.CylinderGeometry(10 * S, 12.5 * S, 8.5 * S, 14), hullM);
+    turretPivot.add(tb); parts.push(tb);
+    const tbTop = new THREE.Mesh(new THREE.CylinderGeometry(8 * S, 10 * S, 2 * S, 14), topM);
+    tbTop.position.y = 5 * S;
+    turretPivot.add(tbTop); parts.push(tbTop);
+    const hatch = new THREE.Mesh(new THREE.CylinderGeometry(3.4 * S, 3.4 * S, 1.5 * S, 10), topM);
+    hatch.position.set(-2 * S, 6.2 * S, 1.5 * S);
+    turretPivot.add(hatch); parts.push(hatch);
+  }
+
+  // маска орудия (у башенных ПТ-машины нет — у них рубка)
+  if (!isTD) {
+    const mask = new THREE.Mesh(new THREE.CylinderGeometry(4.4 * S, 4.4 * S, 5 * S, 10), darkM);
+    mask.rotation.z = Math.PI / 2;
+    mask.position.set(v.nation === 'ger' ? 12 * S : 10 * S, 1 * S, 0);
+    turretPivot.add(mask); parts.push(mask);
+  }
+
+  // ствол + дульный тормоз
+  const barrelPivot = new THREE.Group();
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(v.barrelR, v.barrelR, v.barrelLen, 10), darkM);
+  barrel.rotation.z = Math.PI / 2;
+  barrel.position.x = v.barrelLen / 2 - 6 * S;
+  barrelPivot.add(barrel); parts.push(barrel);
+  if (v.mb) {
+    const brake = new THREE.Mesh(new THREE.CylinderGeometry(v.barrelR * 1.7, v.barrelR * 1.7, 4.5 * S, 8), darkM);
+    brake.rotation.z = Math.PI / 2;
+    brake.position.x = v.barrelLen - 5 * S;
+    barrelPivot.add(brake); parts.push(brake);
+  }
+  turretPivot.add(barrelPivot);
+  group.add(turretPivot);
+
+  // опознавательные знаки (звезда СССР / звезда США / балкенкройц) — как в WoT
+  const markTex = (function () {
+    if (markTexCache[v.nation]) return markTexCache[v.nation];
+    const t = canvTex(128, 128, g => {
+      g.clearRect(0, 0, 128, 128);
+      if (v.nation === 'ussr') {
+        g.fillStyle = '#c8322b';
+        g.translate(64, 64);
+        g.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const a = -Math.PI / 2 + i * (2 * Math.PI / 5);
+          const b = a + (2 * Math.PI / 5) / 2;
+          g.lineTo(Math.cos(a) * 56, Math.sin(a) * 56);
+          g.lineTo(Math.cos(b) * 23, Math.sin(b) * 23);
+        }
+        g.closePath(); g.fill();
+        g.strokeStyle = '#7d1d18'; g.lineWidth = 4; g.stroke();
+      } else if (v.nation === 'usa') {
+        g.fillStyle = '#e8e6da';
+        g.beginPath(); g.arc(64, 64, 54, 0, 6.28); g.fill();
+        g.fillStyle = '#3a4a3a';
+        g.beginPath(); g.arc(64, 64, 40, 0, 6.28); g.fill();
+        g.fillStyle = '#e8e6da';
+        g.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const a = -Math.PI / 2 + i * (2 * Math.PI / 5);
+          const b = a + (2 * Math.PI / 5) / 2;
+          g.lineTo(64 + Math.cos(a) * 38, 64 + Math.sin(a) * 38);
+          g.lineTo(64 + Math.cos(b) * 15, 64 + Math.sin(b) * 15);
+        }
+        g.closePath(); g.fill();
+      } else if (v.nation === 'gb') {
+        // британская кокарда: синий / белый / красный круги
+        g.fillStyle = '#2b4ea8';
+        g.beginPath(); g.arc(64, 64, 54, 0, 6.28); g.fill();
+        g.fillStyle = '#e8e6da';
+        g.beginPath(); g.arc(64, 64, 38, 0, 6.28); g.fill();
+        g.fillStyle = '#c8322b';
+        g.beginPath(); g.arc(64, 64, 22, 0, 6.28); g.fill();
+        g.strokeStyle = '#1a2f66'; g.lineWidth = 5;
+        g.beginPath(); g.arc(64, 64, 54, 0, 6.28); g.stroke();
+      } else {
+        g.fillStyle = '#e3e3da';
+        g.fillRect(30, 52, 68, 24);
+        g.fillRect(52, 30, 24, 68);
+        g.strokeStyle = '#5a5a52'; g.lineWidth = 5; g.strokeRect(32, 54, 64, 20); g.strokeRect(54, 32, 20, 64);
+      }
+    });
+    t.anisotropy = 4;
+    markTexCache[v.nation] = t;
+    return t;
+  })();
+  const markMat = new THREE.MeshBasicMaterial({ map: markTex, transparent: true, depthWrite: false });
+  const markSize = 5.4 * S;
+  for (const side of [-1, 1]) {
+    const zn = new THREE.Mesh(new THREE.PlaneGeometry(markSize, markSize), markMat);
+    zn.rotation.y = side * Math.PI / 2;
+    const zr = (isTD ? 6.8 : v.nation === 'usa' ? 7.2 : v.nation === 'ger' ? 7.6 : v.nation === 'gb' ? 7.4 : 12.6) * S;
+    zn.position.set(isTD ? -1 * S : -1.5 * S, (isTD ? 1.5 : 1.2) * S, side * (zr + 0.25 * S));
+    turretPivot.add(zn); parts.push(zn);
+  }
+
+  // зенитный пулемёт (у старших башенных машин)
+  if (!isTD && v.tier >= 6) {
+    const aa = new THREE.Mesh(new THREE.CylinderGeometry(0.55 * S, 0.55 * S, 7 * S, 6), darkM);
+    aa.rotation.z = Math.PI / 2 - 0.5;
+    aa.position.set(-3 * S, 6.8 * S, 0);
+    turretPivot.add(aa); parts.push(aa);
+    const aaMount = new THREE.Mesh(new THREE.BoxGeometry(1.2 * S, 1.6 * S, 1.2 * S), darkM);
+    aaMount.position.set(-4.5 * S, 6.6 * S, 0);
+    turretPivot.add(aaMount); parts.push(aaMount);
+  }
+
+  // решётка МТО (тёмная панель с рёбрами на кормовой части)
+  const grill = new THREE.Mesh(new THREE.BoxGeometry(14 * S, 1.1 * S, 15 * S), matOf(0x191917, 0.95, 0.3));
+  grill.position.set(-L * 0.28, baseY + h * (1 - roof * 0.5) + 1.4 * S, 0);
+  group.add(grill); parts.push(grill);
+  for (let i = -2; i <= 2; i++) {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(14.5 * S, 0.9 * S, 0.9 * S), matOf(0x2a2a26, 0.9, 0.35));
+    rib.position.set(-L * 0.28, baseY + h * (1 - roof * 0.5) + 2.1 * S, i * 3 * S);
+    group.add(rib); parts.push(rib);
+  }
+
+  // ЗИП-ящик и инструмент (лом) на борту
+  if (v.tier >= 3) {
+    const tool = new THREE.Mesh(new THREE.CylinderGeometry(0.4 * S, 0.4 * S, 22 * S, 5), darkM);
+    tool.rotation.z = Math.PI / 2;
+    tool.position.set(-L * 0.05, topY + 2.2 * S, trackZ + 0.4 * S);
+    group.add(tool); parts.push(tool);
+  }
+
+  // детали корпуса
+  if (v.tier >= 2) {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(9 * S, 4 * S, 6 * S), topM);
+    box.position.set(-L / 2 + 5 * S, baseY + h * 0.5, 0);
+    group.add(box); parts.push(box);
+  }
+  if (v.tier >= 4) {
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * S, 0.35 * S, 16 * S, 5), darkM);
+    ant.position.set(-L / 2 + 2.5 * S, baseY + h + 8 * S, W * 0.3);
+    group.add(ant); parts.push(ant);
+  }
+  const light = new THREE.Mesh(new THREE.CylinderGeometry(1.1 * S, 1.1 * S, 1.4 * S, 8), matOf(0xd8d8b8, 0.4, 0.1));
+  light.rotation.z = Math.PI / 2;
+  light.position.set(L * 0.42, baseY + h * 0.7, -W * 0.28);
+  group.add(light); parts.push(light);
+
+  /* ===== ВЫСОКАЯ ДЕТАЛИЗАЦИЯ ===== */
+  // запасные траки на лбу (у башенных машин 5+ уровня)
+  if (!isTD && v.tier >= 5) {
+    const spar = new THREE.Mesh(new THREE.BoxGeometry(6 * S, 4.5 * S, 3 * S), darkM);
+    spar.rotation.z = -0.35;
+    spar.position.set(L * 0.36, baseY + h * 0.42, 0);
+    group.add(spar); parts.push(spar);
+    for (let i = -1; i <= 1; i++) {
+      const link = new THREE.Mesh(new THREE.BoxGeometry(1.4 * S, 4.8 * S, 0.8 * S), wheelM);
+      link.rotation.z = -0.35;
+      link.position.set(L * 0.36, baseY + h * 0.42, i * 1.1 * S);
+      group.add(link); parts.push(link);
+    }
+  }
+  // топливные бочки на корме (4+ уровень)
+  if (v.tier >= 4) {
+    for (const side of [-1, 1]) {
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(2.6 * S, 2.6 * S, 5.5 * S, 10), matOf(0x4a4a3a, 0.7, 0.3));
+      drum.rotation.x = Math.PI / 2;
+      drum.position.set(-L / 2 + 2 * S, baseY + 2.8 * S, side * (W * 0.22));
+      group.add(drum); parts.push(drum);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.8 * S, 0.8 * S, 0.8 * S, 8), darkM);
+      cap.rotation.x = Math.PI / 2;
+      cap.position.set(-L / 2 + 2 * S, baseY + 5.4 * S, side * (W * 0.22));
+      group.add(cap); parts.push(cap);
+    }
+  }
+  // выхлопная труба
+  const exh = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * S, 1.2 * S, 6 * S, 8), matOf(0x35352f, 0.6, 0.5));
+  exh.rotation.x = 0.4;
+  exh.position.set(-L / 2 + 3.5 * S, baseY + h * 0.4, W * 0.34);
+  group.add(exh); parts.push(exh);
+  // буксирный трос вдоль борта
+  const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * S, 0.35 * S, L * 0.7, 5), matOf(0x5a554a, 0.5, 0.4));
+  cable.rotation.z = Math.PI / 2;
+  cable.position.set(-L * 0.1, baseY + h * 0.78, W * 0.42);
+  group.add(cable); parts.push(cable);
+  // перископы на башне (башенные машины 3+ уровня)
+  if (!isTD && v.tier >= 3) {
+    for (const side of [-1, 1]) {
+      const per = new THREE.Mesh(new THREE.BoxGeometry(1.8 * S, 1.4 * S, 1.2 * S), darkM);
+      per.position.set(-4 * S + 2 * S, 5.2 * S, side * 3.5 * S);
+      turretPivot.add(per); parts.push(per);
+    }
+  }
+  // дымовые гранатомёты (7+ уровень, башенные)
+  if (!isTD && v.tier >= 7) {
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const smk = new THREE.Mesh(new THREE.CylinderGeometry(0.45 * S, 0.55 * S, 2.2 * S, 6), matOf(0x3a4a3a, 0.5, 0.4));
+        smk.rotation.z = 0.5;
+        smk.position.set(-2 * S, 3.4 * S + i * 0.3 * S, side * (7.6 * S));
+        turretPivot.add(smk); parts.push(smk);
+      }
+    }
+  }
+  // наблюдательная башенка/перископ командира на крыше башни (5+ уровень)
+  if (!isTD && v.tier >= 5) {
+    const obs = new THREE.Mesh(new THREE.CylinderGeometry(1.6 * S, 1.8 * S, 1.6 * S, 10), topM);
+    obs.position.set(3.5 * S, 6.4 * S, 0);
+    turretPivot.add(obs); parts.push(obs);
+  }
+
+  for (const p of parts) { p.castShadow = true; p.receiveShadow = true; }
+  return { group, turretPivot, barrelPivot, wheels };
+}
+
+/* ============ ВНЕШНИЕ GLB-МОДЕЛИ (папка models/) ============ */
+/* Как подключить реалистичную модель: положите models/<id>.glb (например models/ussr_medium_3.glb)
+   и при желании models/<id>.json: { "rotY": -90, "turret": "имя ноды башни", "gun": "имя ноды ствола" }.
+   Имена нод смотрите: python3 list_glb.py models/<id>.glb */
+const extLoader = (typeof THREE !== 'undefined' && THREE.GLTFLoader) ? new THREE.GLTFLoader() : null;
+const extCache = {};   // vehId -> Promise<gltf | null>
+const extJsonCache = {};
+function extConfig(v) {
+  if (extJsonCache[v.id] !== undefined) return extJsonCache[v.id];
+  extJsonCache[v.id] = null;
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', 'models/' + v.id + '.json', false);
+    xhr.send();
+    if (xhr.status === 200) extJsonCache[v.id] = JSON.parse(xhr.responseText);
+  } catch (e) {}
+  return extJsonCache[v.id];
+}
+function loadExtGLB(v) {
+  if (!extLoader) return Promise.resolve(null);
+  if (extCache[v.id]) return extCache[v.id];
+  extCache[v.id] = new Promise(res => {
+    extLoader.load('models/' + v.id + '.glb', g => res(g), undefined, () => res(null));
+  });
+  return extCache[v.id];
+}
+/* Собирает игровую группу {group, turretPivot, barrelPivot, wheels} из GLB: масштаб под класс,
+   поворот, центровка, отдельно вращающаяся башня и ствол (по именам нод из json) */
+function extParts(v, gltf, t) {
+  const cfg = extConfig(v) || {};
+  const S = v.scale;
+  const tint = t ? (t.team === 'player'
+    ? NATION_PLAYER_TINT[v.nation]
+    : t.team === 'ally' ? ALLY_TINT : ENEMY_TINT[v.nation])
+    : (NATION_PLAYER_TINT[v.nation] || { hull: 0x556644, top: 0x778855 });
+  const isHeavy = v.type === 'heavy';
+  const isLight = v.type === 'light';
+  const L = 54 * (isHeavy ? 1.09 : isLight ? 0.94 : 1) * S;   // целевая длина корпуса
+  const root = new THREE.Group();
+  const inner = new THREE.Group();
+  root.add(inner);
+  inner.add(gltf.scene);
+  const rotY = (cfg.rotY !== undefined ? cfg.rotY : -90) * DEG;   // Sketchfab-модели обычно смотрят в +Z
+  inner.rotation.y = rotY;
+  root.updateMatrixWorld(true);
+  // масштаб по длине X после поворота
+  let bb = new THREE.Box3().setFromObject(inner);
+  let size = bb.getSize(new THREE.Vector3());
+  const k = L / Math.max(1e-6, size.x);
+  inner.scale.setScalar(k);
+  root.updateMatrixWorld(true);
+  // центровка: центр XZ в нуле, низ на земле
+  bb = new THREE.Box3().setFromObject(inner);
+  const c = bb.getCenter(new THREE.Vector3());
+  inner.position.x -= c.x;
+  inner.position.z -= c.z;
+  inner.position.y -= bb.min.y;
+  root.updateMatrixWorld(true);
+  // материалы: цвета и текстуры из самой модели; только металлик/шероховатость
+  gltf.scene.traverse(o => {
+    if (o.isMesh && o.material) {
+      o.castShadow = true; o.receiveShadow = true;
+      // перекраска по имени материала — команды в бою различаются по цвету
+      const mn = String(o.material.name || '').toLowerCase();
+      if (mn === 'hull' || mn === 'rack' || mn === 'deck') {
+        o.material.color.set(mn === 'deck' ? tint.top : tint.hull);
+      }
+      o.material.metalness = 0.22;
+      o.material.roughness = 0.62;
+      o.material.side = THREE.DoubleSide;
+    }
+  });
+  // башня: реальные ноды turret/gun из GLB (если заданы в json) — иначе пустые пивоты
+  const nT = cfg.turret ? gltf.scene.getObjectByName(cfg.turret) : null;
+  const nG = cfg.gun ? gltf.scene.getObjectByName(cfg.gun) : null;
+  let turretPivot = new THREE.Group();
+  let barrelPivot = new THREE.Group();
+  if (nT) {
+    const tp = new THREE.Group();
+    root.add(tp);
+    root.updateMatrixWorld(true);
+    tp.position.copy(nT.getWorldPosition(new THREE.Vector3()));
+    root.updateMatrixWorld(true);
+    tp.attach(nT);
+    turretPivot = tp;
+    if (nG) {
+      const bp = new THREE.Group();
+      tp.add(bp);
+      root.updateMatrixWorld(true);
+      bp.position.copy(nG.getWorldPosition(new THREE.Vector3()));
+      root.updateMatrixWorld(true);
+      bp.attach(nG);
+      barrelPivot = bp;
+    } else {
+      tp.add(barrelPivot);
+      barrelPivot.position.set(0, 8, 0);
+    }
+  } else {
+    turretPivot.add(barrelPivot);
+    const bbF = new THREE.Box3().setFromObject(inner);
+    const cF = bbF.getCenter(new THREE.Vector3());
+    turretPivot.position.set(cF.x, cF.y + 6, cF.z);
+    root.add(turretPivot);
+  }
+  return { group: root, turretPivot, barrelPivot, wheels: [] };
+}
+/* Подставляет внешнюю модель вместо параметрической. onOk вызывается синхронно, если модель уже
+   готова; иначе — асинхронно после загрузки. Если GLB нет/ошибка — ничего не делает. */
+function tryExtModel(v, t, onOk) {
+  loadExtGLB(v).then(g => {
+    if (!g) return;
+    const ext = extParts(v, g, t);
+    if (t) {
+      const needSwap = t.model && t.model.group.parent;
+      if (needSwap) tanksGroup.remove(t.model.group);
+      t.model = ext; t.turretPivot = ext.turretPivot; t.barrelPivot = ext.barrelPivot; t.wheels = [];
+      tanksGroup.add(ext.group);
+    }
+    if (onOk) onOk(ext);
+  });
+}
+
+function makeTank(x, z, team, vehId, statMul) {
+  const cls = VEHICLES[vehId];
+  const tint = team === 'player'
+    ? NATION_PLAYER_TINT[cls.nation]
+    : team === 'ally'
+      ? ALLY_TINT
+      : ENEMY_TINT[cls.nation];
+  const model = makeTankModel(cls, tint);
+  const m = statMul || { hp: 1, dmg: 1, cd: 1, speed: 1 };
+  let barBg = null, barFg = null;
+  if (team !== 'player') {
+    barBg = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x000000, transparent: true, opacity: 0.55 }));
+    barBg.scale.set(52, 7, 1);
+    barFg = new THREE.Sprite(new THREE.SpriteMaterial({ color: team === 'ally' ? 0x6fc3ff : 0x9fd45f, transparent: true, opacity: 0.95 }));
+    barFg.scale.set(50, 4.5, 1);
+    fxGroup.add(barBg); fxGroup.add(barFg);
+  }
+  const baseY = heightAt(x, z);
+  model.group.position.set(x, baseY, z);
+  const t = {
+    vehId, cls, team, isPlayer: team === 'player', model,
+    turretPivot: model.turretPivot, barrelPivot: model.barrelPivot, wheels: model.wheels,
+    barBg, barFg, land: 0.02,
+    x, z, angle: team === 'player' ? 0 : rand(0, 6.28),
+    turret: team === 'player' ? 0 : rand(0, 6.28),
+    el: 0.02,
+    speed: cls.speed * m.speed, hp: Math.round(cls.hp * m.hp), maxHp: Math.round(cls.hp * m.hp),
+    dmg: cls.dmg * m.dmg, cooldown: cls.cd * m.cd, fireT: 0, recoil: 0, alive: true, flash: 0, wheelVel: 0,
+    pen: vehPen(cls, team === 'player' ? save.mods.gun : 0),
+    armor: ARMOR[cls.type],
+    discovered: team !== 'enemy', revealedT: 0,
+    clipSize: (cls.clip || (cls.cycle ? cls.cycleSize : 0)) || 0,
+    clipLeft: 0, magState: 'ready', cycleAcc: 0,
+    ai: team !== 'player' ? { t: 0, strafeDir: 1, aimErr: 0 } : null
+  };
+  t.clipLeft = t.clipSize;
+  tanksGroup.add(model.group);
+  // внешняя GLB-модель (папка models/) — при наличии подменяет параметрическую
+  tryExtModel(cls, t);
+  return t;
+}
+
+/* ============ АНГАР / ДЕРЕВО РАЗВИТИЯ ============ */
+let previewTank = null;
+let activeNation = 'ussr';
+function nationTanks() {
+  const out = [];
+  for (const ty of TYPES) for (const v of TREES[activeNation][ty]) out.push(v.id);
+  return out;
+}
+/* Точная высота меша земли в точке (луч вниз по ground). Меш — линейная сетка,
+   и на кривом рельефе его полигоны проходят выше аналитической heightAt. */
+function groundYAt(x, z) {
+  try {
+    const rc = new THREE.Raycaster(new THREE.Vector3(x, 500, z), new THREE.Vector3(0, -1, 0));
+    const hits = rc.intersectObject(ground, false);
+    if (hits.length) return hits[0].point.y;
+  } catch (e) {}
+  return heightAt(x, z);
+}
+function buildPreview() {
+  if (previewTank) { tanksGroup.remove(previewTank.group); previewTank = null; }
+  const v = VEHICLES[selectedVeh];
+  const model = makeTankModel(v, NATION_PLAYER_TINT[v.nation]);
+  const py = groundYAt(ARENA_W / 2, ARENA_H / 2);
+  model.group.position.set(ARENA_W / 2, py, ARENA_H / 2);
+  tanksGroup.add(model.group);
+  previewTank = model;
+  // внешняя GLB-модель для предосмотра
+  tryExtModel(v, null, ext => {
+    ext.group.position.copy(model.group.position);
+    const bb = new THREE.Box3().setFromObject(ext.group);
+    if (bb.min.y < py - 1) ext.group.position.y += (py - bb.min.y);
+    if (previewTank === model && model.group.parent) tanksGroup.remove(model.group);
+    previewTank = ext;
+    tanksGroup.add(ext.group);
+  });
+  const st = effStats(selectedVeh);
+  const kmh = Math.round(st.speed * 0.36);
+  const rows = [
+    ['Скорость', kmh + ' км/ч'],
+    ['Прочность (HP)', Math.round(st.hp)],
+    ['Урон', Math.round(st.dmg)],
+    ['Перезарядка', st.cd.toFixed(2) + ' с'],
+    ['Пробитие', vehPen(v, save.mods.gun) + ' мм'],
+    ['Броня (лоб/борт/корма)', v.armor ? v.armor.front + '/' + v.armor.side + '/' + v.armor.rear : '—'],
+    ['Поворот орудия', st.turretSpeed + '°/с'],
+    ['Разворот корпуса', st.hullSpeed + '°/с']
+  ];
+  if (v.sector) rows.push(['Тип огня', 'Прямой, сектор ' + v.sector + '°']);
+  else if (v.clip) rows.push(['Тип огня', 'Барабан на ' + v.clip + ' × ' + v.dmg + ' урона']);
+  else if (v.cycle) rows.push(['Тип огня', 'Циклический магазин, ' + v.cycleSize + ' снарядов']);
+  else rows.push(['Тип огня', 'Прямой']);
+  document.getElementById('hStats').innerHTML = rows.map(r => `<div class="hRow"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`).join('');
+  document.getElementById('hName').textContent = v.name;
+  let hType = NATIONS[v.nation] + ' • ' + TYPE_LABELS[v.type] + ' • ' + v.tier + ' ур.';
+  if (v.premium) hType = 'ПРЕМИУМ • ' + hType;
+  document.getElementById('hType').textContent = hType;
+  document.getElementById('hDesc').textContent = v.premium ? 'Премиум-техника: +50% монет за каждый бой. Покупается за золото.' : TYPE_DESCS[v.type];
+  renderHangar();
+}
+function renderHangar() {
+  document.getElementById('hMoney').textContent = 'МОНЕТЫ: ' + save.money + '   •   ЗОЛОТО: ' + save.gold;
+  renderMapSel();
+  renderDaily();
+  if (activeView === 'shop') { renderShop(); return; }
+  // вкладки наций
+  document.getElementById('nationTabs').innerHTML = NATION_ORDER.map(n =>
+    `<div class="nTab ${n === activeNation ? 'active' : ''}" data-nation="${n}">${NATIONS[n]}</div>`
+  ).join('');
+  // дерево: ветки по типам техники
+  document.getElementById('treeWrap').innerHTML = TYPES.map(ty => {
+    const cards = TREES[activeNation][ty].map(v => {
+      const id = v.id;
+      const owned = save.owned.includes(id);
+      const price = owned ? 0 : VEH_TIER_PRICES[v.tier - 1];
+      const sel = save.selected === id;
+      const cls = ['treeCard'];
+      if (sel) cls.push('selected');
+      if (owned) cls.push('owned');
+      if (!owned) { cls.push('locked'); if (save.money < price) cls.push('poor'); }
+      const st = effStats(id);
+      return `<div class="${cls.join(' ')}" data-veh="${id}">
+        <div class="treeTier">${v.tier} УР.</div>
+        <div class="treeName">${v.name}</div>
+        <div class="treeType">${TYPE_LABELS[v.type]}</div>
+        <div class="treeStats">${Math.round(st.hp)} HP<br>${Math.round(st.dmg)} урн<br>${Math.round(st.speed * 0.36)} км/ч<br>${v.armor.front}/${v.armor.side}/${v.armor.rear} броня</div>
+        <div class="treePrice">${owned ? 'В АНГАРЕ' : (price ? price + ' монет' : 'БЕСПЛАТНО')}</div>
+      </div>`;
+    }).join('');
+    return `<div class="branchCol" data-branch="${ty}"><div class="branchTitle">${BRANCH_TITLES[ty]}</div>${cards}</div>`;
+  }).join('');
+  // кнопка
+  const owned = save.owned.includes(selectedVeh);
+  const price = owned ? 0 : VEH_TIER_PRICES[VEHICLES[selectedVeh].tier - 1];
+  const btn = document.getElementById('hBuy');
+  if (price === 0 && save.selected === selectedVeh) { btn.textContent = 'ВЫБРАНО'; btn.disabled = true; btn.classList.add('sel'); }
+  else if (!owned) {
+    const fin = save.cert > 0 ? Math.round(price * 0.85) : price;
+    btn.textContent = price ? (save.cert > 0 ? 'РАЗБЛОКИРОВАТЬ — ' + fin + ' (сертификат −15%)' : 'РАЗБЛОКИРОВАТЬ — ' + price) : 'ЗАБРАТЬ БЕСПЛАТНО';
+    btn.disabled = save.money < fin; btn.classList.remove('sel');
+  }
+  else if (save.selected !== selectedVeh) { btn.textContent = 'ВЫБРАТЬ'; btn.disabled = false; btn.classList.remove('sel'); }
+  else { btn.textContent = 'ВЫБРАТЬ'; btn.disabled = false; btn.classList.remove('sel'); }
+  // модули
+  const modsHtml = Object.keys(MODS).map(id => {
+    const m = MODS[id];
+    const lvl = save.mods[id];
+    const maxed = lvl >= m.cost.length;
+    const cost = maxed ? null : m.cost[lvl];
+    const btnHtml = maxed
+      ? '<div class="modMax">МАКСИМУМ</div>'
+      : `<button class="modBuy" data-mod="${id}" ${save.money >= cost ? '' : 'disabled'}>УЛУЧШИТЬ — ${cost}</button>`;
+    return `<div class="modRow"><div class="modTop"><span class="modName">${m.name}</span><span class="modLvl">ур. ${lvl}/${m.cost.length}</span></div><div class="modDesc">${m.desc}</div>${btnHtml}</div>`;
+  }).join('');
+  document.getElementById('hMods').innerHTML = modsHtml;
+}
+function renderMapSel() {
+  document.getElementById('mapSel').innerHTML = MAPS.map(m =>
+    `<div class="mapBtn ${m.id === mapId ? 'active' : ''}" data-map="${m.id}">${m.name}</div>`
+  ).join('');
+}
+function renderShop() {
+  document.getElementById('shopGrid').innerHTML = PREMIUM.map(p => {
+    const v = VEHICLES[p.id];
+    const st = effStats(p.id);
+    const owned = save.prem.includes(p.id);
+    const sel = save.selected === p.id;
+    const fin = save.cert > 0 ? Math.round(p.gold * 0.85) : p.gold;
+    const btn = owned
+      ? (sel ? 'ВЫБРАНО' : 'ВЫБРАТЬ')
+      : `КУПИТЬ — ${fin} ⭐`;
+    return `<div class="shopCard ${owned ? 'owned' : ''}">
+      <div class="premTag">ПРЕМИУМ +50% МОНЕТ</div>
+      <div class="scName">${v.name}</div>
+      <div class="scType">${NATIONS[v.nation]} • ${TYPE_LABELS[v.type]} • ${v.tier} ур.</div>
+      <div class="scStats">${Math.round(st.hp)} HP • ${Math.round(st.dmg)} урн • ${Math.round(st.speed * 0.36)} км/ч</div>
+      <div class="scPrice">⭐ ${p.gold} золота</div>
+      <button data-prem="${p.id}" ${(!owned && save.gold < fin) ? 'disabled' : ''}>${btn}</button>
+    </div>`;
+  }).join('');
+  document.getElementById('certInfo').textContent = (save.cert > 0 ? 'Сертификаты скидки: ' + save.cert + ' (−15% на покупку техники)' : 'Сертификатов нет — выиграйте в рулетке!');
+}
+function renderDaily() {
+  const st = dailyState();
+  const b = document.getElementById('dailyBtn');
+  b.textContent = '🎁 НАГРАДА ДНЯ ' + st.day + ': ' + dailyRewardText(st.day) + (st.claimable ? ' — ЗАБРАТЬ!' : ' (завтра)');
+  b.classList.toggle('ready', st.claimable);
+}
+function vehPrice(id) { return save.owned.includes(id) ? 0 : VEH_TIER_PRICES[VEHICLES[id].tier - 1]; }
+function buySelected() {
+  const base = vehPrice(selectedVeh);
+  if (save.owned.includes(selectedVeh)) return;
+  const price = save.cert > 0 ? Math.round(base * 0.85) : base;
+  if (price > save.money) return;
+  if (save.cert > 0) save.cert--;
+  save.money -= price;
+  save.owned.push(selectedVeh);
+  save.selected = selectedVeh;
+  persistSave();
+  buildPreview();
+}
+function buyPremium(id) {
+  const v = VEHICLES[id];
+  if (save.prem.includes(id)) {
+    save.selected = id;
+    persistSave();
+    buildPreview();
+    return;
+  }
+  let price = v.gold;
+  let usedCert = false;
+  if (save.cert > 0) { price = Math.round(price * 0.85); usedCert = true; }
+  if (save.gold < price) return;
+  if (save.cert > 0) save.cert--;
+  save.gold -= price;
+  save.prem.push(id);
+  save.selected = id;
+  persistSave();
+  buildPreview();
+  showModal('Куплено!', `Премиум-танк «${v.name}» ваш${usedCert ? ' (применён сертификат −15%)' : ''}. Он приносит +50% монет за бой.`);
+}
+function selectCurrent() {
+  if (!save.owned.includes(selectedVeh)) return;
+  save.selected = selectedVeh;
+  persistSave();
+  buildPreview();
+}
+function buyMod(id) {
+  const m = MODS[id];
+  const lvl = save.mods[id];
+  if (lvl >= m.cost.length) return;
+  const cost = m.cost[lvl];
+  if (save.money < cost) return;
+  save.money -= cost;
+  save.mods[id] = lvl + 1;
+  persistSave();
+  buildPreview();
+}
+document.getElementById('hBuy').addEventListener('click', () => {
+  if (save.selected !== selectedVeh && save.owned.includes(selectedVeh)) selectCurrent();
+  else buySelected();
+});
+document.getElementById('hMods').addEventListener('click', e => {
+  const id = e.target && e.target.dataset ? e.target.dataset.mod : null;
+  if (id) buyMod(id);
+});
+document.getElementById('nationTabs').addEventListener('click', e => {
+  const n = e.target && e.target.dataset ? e.target.dataset.nation : null;
+  if (n && NATION_ORDER.includes(n)) {
+    activeNation = n;
+    // авто-выбор первой техники нации, если текущая — из другой
+    if (nationOf(selectedVeh) !== n) selectedVeh = nationTanks()[0];
+    buildPreview();
+  }
+});
+document.getElementById('treeWrap').addEventListener('click', e => {
+  const id = e.target && e.target.closest ? (e.target.closest('[data-veh]') || {}).dataset : (e.target.dataset || {});
+  const veh = e.target && e.target.closest ? (e.target.closest('[data-veh]') || {}).dataset.veh : e.target.dataset.veh;
+  if (veh) { selectedVeh = veh; activeNation = nationOf(veh); buildPreview(); }
+});
+function shiftTier(dir) {
+  const tree = nationTanks();
+  let i = tree.indexOf(selectedVeh);
+  if (i < 0) i = 0;
+  i = (i + dir + tree.length) % tree.length;
+  selectedVeh = tree[i];
+  buildPreview();
+}
+document.getElementById('hPrev').addEventListener('click', () => shiftTier(-1));
+document.getElementById('hNext').addEventListener('click', () => shiftTier(1));
+
+/* ============ ВИДЫ АНГАРА, КАРТЫ, МАГАЗИН, НАГРАДЫ ============ */
+let activeView = 'tech';
+const _el = id => document.getElementById(id);
+function showModal(title, text) {
+  _el('mTitle').textContent = title;
+  _el('mBody').innerHTML = '<p style="line-height:1.7">' + text + '</p>';
+  _el('mClose').style.display = '';
+  _el('modal').classList.remove('hidden');
+}
+function closeModal() { _el('modal').classList.add('hidden'); }
+_el('mClose').addEventListener('click', closeModal);
+_el('viewTech').addEventListener('click', () => {
+  activeView = 'tech';
+  _el('viewTech').classList.add('active'); _el('viewShop').classList.remove('active');
+  _el('techView').classList.remove('hidden'); _el('shopView').classList.add('hidden');
+  renderHangar();
+});
+_el('viewShop').addEventListener('click', () => {
+  activeView = 'shop';
+  _el('viewShop').classList.add('active'); _el('viewTech').classList.remove('active');
+  _el('techView').classList.add('hidden'); _el('shopView').classList.remove('hidden');
+  renderHangar();
+});
+_el('mapSel').addEventListener('click', e => {
+  const id = e.target && e.target.dataset ? e.target.dataset.map : null;
+  if (!id || !MAPS.some(m => m.id === id)) return;
+  mapId = id;
+  save.mapId = id;
+  persistSave();
+  setMap(MAPS.find(m => m.id === id));
+  buildPreview();
+});
+_el('shopGrid').addEventListener('click', e => {
+  const id = e.target && e.target.dataset ? e.target.dataset.prem : null;
+  if (id) buyPremium(id);
+});
+
+/* Режим осмотра: прячем интерфейс ангара, чтобы видеть модель танка */
+function enterInspect() {
+  _el('hangar').style.display = 'none';
+  _el('inspectBar').classList.remove('hidden');
+  hangarUserYaw = hangarUserYaw === null ? hangarT * 0.25 : hangarUserYaw;
+  // для чистого обзора выравниваем рельеф вокруг модели (убираем холмы)
+  const p = previewTank && previewTank.group;
+  if (p) { p.position.y = heightAt(p.position.x, p.position.z); }
+}
+function exitInspect() {
+  _el('hangar').style.display = '';
+  _el('inspectBar').classList.add('hidden');
+}
+_el('hInspect').addEventListener('click', enterInspect);
+_el('inspectBack').addEventListener('click', exitInspect);
+// в режиме осмотра клавиша R тоже возвращает в ангар
+window.addEventListener('keydown', e => {
+  if (e.code === 'Escape' && state === 'hangar' && !_el('inspectBar').classList.contains('hidden')) exitInspect();
+});
+_el('rouletteBtn').addEventListener('click', roulette);
+_el('dailyBtn').addEventListener('click', claimDaily);
+
+function roulette() {
+  if (save.money < 500) { showModal('Рулетка удачи', 'Нужно 500 монет. Заработайте их в бою!'); return; }
+  save.money -= 500;
+  const win = Math.random() < 0.3;
+  if (win) { save.cert += 1; showModal('ПОБЕДА!', 'Вы выиграли сертификат на скидку <b>15%</b>! Он применится при следующей покупке техники.'); }
+  else showModal('Не повезло', 'Увы, в этот раз пусто. Шанс — 30%. Попробуйте ещё!');
+  persistSave();
+  renderHangar();
+}
+function dailyState() {
+  const today = new Date().toDateString();
+  if (save.daily.last === today) return { claimable: false, day: Math.max(1, save.daily.streak || 1) };
+  const yest = new Date(Date.now() - 864e5).toDateString();
+  return { claimable: true, day: save.daily.last === yest ? (save.daily.streak % 31) + 1 : 1 };
+}
+function dailyRewardText(day) {
+  day = ((day - 1) % 31) + 1;
+  if (day === 31) return 'танк 7–8 ур. на выбор';
+  const coins = Math.min(700, 100 + (day - 1) * 20);
+  const gold = day % 7 === 0 ? Math.floor(day / 7) : 0;
+  return (coins ? coins + ' монет' : '') + (gold ? ' + ' + gold + ' золота' : '');
+}
+function claimDaily() {
+  const st = dailyState();
+  if (!st.claimable) return;
+  const day = st.day;
+  save.daily.streak = day;
+  save.daily.last = new Date().toDateString();
+  if (day === 31) {
+    persistSave();
+    showPicker();
+    return;
+  }
+  if (day % 7 === 0) save.gold += Math.floor(day / 7);
+  save.money += Math.min(700, 100 + (day - 1) * 20);
+  persistSave();
+  showModal('Ежедневная награда', `День ${day}: +${dailyRewardText(day)}. Завтра — день ${(day % 31) + 1}!`);
+  renderHangar();
+}
+function showPicker() {
+  const list = Object.values(VEHICLES).filter(v => !v.premium && (v.tier === 7 || v.tier === 8));
+  _el('mTitle').textContent = 'НАГРАДА ДНЯ 31: ВЫБЕРИТЕ ТАНК 7–8 УР.';
+  _el('mBody').innerHTML = list.map(v =>
+    `<button class="pickBtn" data-pick="${v.id}">${NATIONS[v.nation]} • ${v.name} (${v.tier} ур.)</button>`
+  ).join('');
+  _el('mClose').style.display = 'none';
+  _el('modal').classList.remove('hidden');
+  _el('mBody').querySelectorAll('.pickBtn').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.pick;
+    if (!save.owned.includes(id)) save.owned.push(id);
+    save.selected = id;
+    persistSave();
+    closeModal();
+    buildPreview();
+  }));
+}
+
+function startGame() {
+  ensureAudio();
+  while (tanksGroup.children.length) tanksGroup.remove(tanksGroup.children[0]);
+  while (fxGroup.children.length) { const c = fxGroup.children[0]; if (c.material && c.material.dispose) c.material.dispose(); fxGroup.remove(c); }
+  fxGroup.add(flashSprite);
+  previewTank = null;
+  tanks = []; bullets = []; particles = []; decals = [];
+  setMap(MAPS.find(m => m.id === mapId) || MAPS[0]);
+  const base = VEHICLES[save.selected];
+  const st = effStats(save.selected);
+  player = makeTank(ARENA_W / 2, ARENA_H / 2, 'player', save.selected, {
+    hp: st.hp / base.hp, dmg: st.dmg / base.dmg, cd: st.cd / base.cd, speed: st.speed / base.speed
+  });
+  player.cls = Object.assign({}, base, st);
+  tanks.push(player);
+  spawnAllies();
+  camYaw = 0;
+  score = 0; kills = 0; wave = 0; waveTimer = 1.2; shake = 0; sessionEarned = 0; sessionGold = 0;
+  state = 'playing';
+  document.getElementById('hangar').style.display = 'none';
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('pause').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('tankName').textContent =
+    (VEHICLES[save.selected].premium ? '★ ' : '') + TYPE_LABELS[VEHICLES[save.selected].type] + ' ' + VEHICLES[save.selected].name;
+}
+function maxAllies() { return tanks.filter(t => t.team === 'enemy' && t.alive).length; }
+function spawnAlly(x, z) {
+  if (x == null) {
+    for (let i = 0; i < 30; i++) {
+      x = player.x + rand(-320, 320); z = player.z + rand(-320, 320);
+      const dx = x - player.x, dz = z - player.z;
+      if (Math.hypot(dx, dz) < 120) continue;
+      if (wallBlocking(x, z, TANK_R + 4)) continue;
+      if (tanks.some(o => o.alive && Math.hypot(o.x - x, o.z - z) < TANK_R * 3)) continue;
+      break;
+    }
+  }
+  const t = makeTank(clamp(x, TANK_R, ARENA_W - TANK_R), clamp(z, TANK_R, ARENA_H - TANK_R), 'ally', 'ussr_light_1', { hp: 1.35, dmg: 0.7, cd: 1.1, speed: 0.95 });
+  t.ai.essence = 'ally';
+  tanks.push(t);
+}
+function spawnAllies() {
+  let alive = tanks.filter(t => t.team === 'ally').length;
+  while (alive < maxAllies()) { spawnAlly(); alive++; }
+}
+document.getElementById('hGo').addEventListener('click', startGame);
+/* Сетевой бой: адрес сервера настраивается (свой комп или хост друга) */
+function netAddr() {
+  const h = (save.netHost || '').trim();
+  if (h) return h;
+  const host = location.hostname;
+  if (host === '127.0.0.1' || host === 'localhost') return host + ':8765';
+  return '';
+}
+function netAddrHint() {
+  const a = netAddr();
+  document.getElementById('netAddrHint').textContent = a ? ('сервер: ' + a) : 'укажите адрес сервера ⚙';
+}
+document.getElementById('hNet').addEventListener('click', () => {
+  const a = netAddr();
+  if (a) { netStart(); return; }
+  _el('netHostInput').value = save.netHost || '';
+  _el('netModal').classList.remove('hidden');
+  _el('netHostInput').focus();
+});
+document.getElementById('hNetCfg').addEventListener('click', () => {
+  _el('netHostInput').value = save.netHost || '';
+  _el('netModal').classList.remove('hidden');
+  _el('netHostInput').focus();
+});
+document.getElementById('netCfgOk').addEventListener('click', () => {
+  const v = _el('netHostInput').value.trim().replace(/^wss?:\/\//, '').replace(/\/$/, '');
+  save.netHost = v;
+  persistSave();
+  _el('netModal').classList.add('hidden');
+  netAddrHint();
+});
+document.getElementById('netCfgCancel').addEventListener('click', () => _el('netModal').classList.add('hidden'));
+document.getElementById('netHostInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('netCfgOk').click();
+});
+document.getElementById('restartBtn').addEventListener('click', () => {
+  if (net) { netLeave(); return; }
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('hangar').style.display = '';
+  state = 'hangar';
+  buildPreview();
+});
+
+/* ============ ВВОД ============ */
+const keys = {};
+const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2, down: false };
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (state === 'playing') { state = 'paused'; document.getElementById('pause').classList.remove('hidden'); }
+    else if (state === 'paused') { state = 'playing'; document.getElementById('pause').classList.add('hidden'); }
+  }
+  if (e.code === 'KeyR' && (state === 'gameover' || state === 'paused' || state === 'playing' || state === 'net')) {
+    if (net) { netLeave(); return; }
+    document.getElementById('gameover').classList.add('hidden');
+    document.getElementById('pause').classList.add('hidden');
+    document.getElementById('hud').classList.add('hidden');
+    document.getElementById('hangar').style.display = '';
+    state = 'hangar';
+    buildPreview();
+  }
+  if (e.code === 'KeyM') soundOn = !soundOn;
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+// предосмотр: вращение модели танка в ангаре зажатой ЛКМ
+let hangarDrag = false, hangarUserYaw = null;
+window.addEventListener('mousemove', e => {
+  const ox = mouse.x;
+  mouse.x = e.clientX; mouse.y = e.clientY;
+  if (state === 'hangar' && hangarDrag) {
+    hangarUserYaw = (hangarUserYaw === null ? hangarT * 0.25 : hangarUserYaw) + (e.clientX - ox) * 0.008;
+  }
+});
+window.addEventListener('mousedown', e => {
+  ensureAudio();
+  if (e.button === 0 && (state === 'playing' || state === 'net')) mouse.down = true;
+  if (e.button === 0 && state === 'hangar') hangarDrag = true;
+});
+window.addEventListener('mouseup', e => { if (e.button === 0) { mouse.down = false; hangarDrag = false; } });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+/* ============ СТОЛКНОВЕНИЯ ============ */
+function circleRectHit(cx, cz, r, w) {
+  const nx = clamp(cx, w.x, w.x + w.w), nz = clamp(cz, w.y, w.y + w.h);
+  const dx = cx - nx, dz = cz - nz;
+  return dx * dx + dz * dz < r * r;
+}
+function resolveTankWalls(t) {
+  for (const w of walls) {
+    const nx = clamp(t.x, w.x, w.x + w.w), nz = clamp(t.z, w.y, w.y + w.h);
+    const dx = t.x - nx, dz = t.z - nz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < TANK_R * TANK_R) {
+      const d = Math.sqrt(d2) || 0.001;
+      const push = (TANK_R - d) / d;
+      t.x += dx * push; t.z += dz * push;
+    }
+  }
+  t.x = clamp(t.x, TANK_R, ARENA_W - TANK_R);
+  t.z = clamp(t.z, TANK_R, ARENA_H - TANK_R);
+}
+function wallBlocking(x, z, r) {
+  for (const w of walls) if (circleRectHit(x, z, r, w)) return w;
+  return null;
+}
+function resolveTankPairs() {
+  for (let i = 0; i < tanks.length; i++) {
+    for (let j = i + 1; j < tanks.length; j++) {
+      const a = tanks[i], b = tanks[j];
+      if (!a.alive || !b.alive) continue;
+      const d = Math.hypot(b.x - a.x, b.z - a.z);
+      if (d < TANK_R * 2 && d > 0.001) {
+        const push = (TANK_R * 2 - d) / 2 / d;
+        a.x -= (b.x - a.x) * push; a.z -= (b.z - a.z) * push;
+        b.x += (b.x - a.x) * push; b.z += (b.z - a.z) * push;
+      }
+    }
+  }
+}
+
+/* ============ ЭФФЕКТЫ ============ */
+function addParticle(kind, x, y, z, vx, vy, vz, life, size, grow, color) {
+  let mat;
+  if (kind === 'smoke') mat = new THREE.SpriteMaterial({ map: smokeTex, transparent: true, opacity: 0.5, depthWrite: false });
+  else mat = new THREE.SpriteMaterial({ map: flareTex, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const sp = new THREE.Sprite(mat);
+  sp.position.set(x, y, z);
+  sp.scale.set(size, size, 1);
+  fxGroup.add(sp);
+  particles.push({ sp, vx, vy, vz, life, maxLife: life, size, grow, kind, base: kind === 'smoke' ? 0.5 : 0.9 });
+}
+function sparks(x, y, z, n, col) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, 6.28), up = rand(-0.2, 0.9), s = rand(80, 340);
+    addParticle('spark', x, y, z, Math.cos(a) * s * Math.sqrt(1 - up * up / 2), up * s * 0.9, Math.sin(a) * s * Math.sqrt(1 - up * up / 2), rand(0.2, 0.5), rand(14, 26), 0, col || 0xffcf6e);
+  }
+}
+function explosion(x, z, big) {
+  const h = heightAt(x, z);
+  shake = Math.max(shake, big ? 20 : 10);
+  addParticle('flash', x, h + 24, z, 0, 0, 0, 0.18, big ? 130 : 80, big ? 220 : 150, 0xffd080);
+  sparks(x, h + 24, z, big ? 34 : 16, 0xffcf6e);
+  sparks(x, h + 24, z, big ? 16 : 7, 0xff6b3a);
+  for (let i = 0; i < (big ? 10 : 5); i++)
+    addParticle('smoke', x + rand(-14, 14), h + 20, z + rand(-14, 14), rand(-24, 24), rand(30, 70), rand(-24, 24), rand(0.6, 1.2), rand(26, 46), rand(20, 40));
+  sfxExplode(big);
+}
+function addScorch(x, z) {
+  if (!sharedGeo.scorch) sharedGeo.scorch = new THREE.CircleGeometry(1, 18);
+  const m = new THREE.Mesh(sharedGeo.scorch, new THREE.MeshBasicMaterial({ color: 0x14100a, transparent: true, opacity: 0.4, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, heightAt(x, z) + 0.08, z);
+  m.scale.set(rand(24, 38), rand(24, 38), 1);
+  fxGroup.add(m);
+  decals.push({ m, life: 10, maxLife: 10 });
+  if (decals.length > 150) { const d = decals.shift(); fxGroup.remove(d.m); d.m.material.dispose(); }
+}
+
+/* ============ УРОН ============ */
+function applyDamage(t, dmg, atX, atY, atZ, attackerTeam) {
+  t.hp -= dmg;
+  t.flash = 0.12;
+  sparks(atX, atY, atZ, 12, 0xffcf6e);
+  sfxHit();
+  shake = Math.max(shake, 4);
+  if (t.hp <= 0) {
+    t.alive = false;
+    explosion(t.x, t.z, true);
+    addScorch(t.x, t.z);
+    tanksGroup.remove(t.model.group);
+    if (t.barBg) { fxGroup.remove(t.barBg); fxGroup.remove(t.barFg); }
+    if (t.isPlayer) {
+      state = 'gameover';
+      document.getElementById('overTitle').textContent = 'ПОДБИТ!';
+      document.getElementById('overStats').textContent =
+        `Уничтожено танков: ${kills} • Очки: ${score} • Волна: ${wave} • Монет: ${sessionEarned} • Золото: ${sessionGold}`;
+      document.getElementById('gameover').classList.remove('hidden');
+      document.getElementById('hud').classList.add('hidden');
+    } else if (t.team === 'enemy') {
+      kills += 1;
+      const premMul = player.cls.premium ? 1.5 : 1;
+      if (attackerTeam === 'player') {
+        score += 100 + wave * 25;
+        const c = Math.round((80 + wave * 10) * premMul);
+        save.money += c; sessionEarned += c;
+      } else if (attackerTeam === 'ally') {
+        score += 25;
+        save.money += 30; sessionEarned += 30;
+      } else {
+        score += 10;
+        save.money += 15; sessionEarned += 15;
+      }
+      persistSave();
+    }
+  }
+}
+
+/* ============ ОБНАРУЖЕНИЕ ============ */
+const VIEW_RANGE = 650;   // радиус, в котором игрок видит врагов
+const ALLY_VIEW = 480;    // союзники докладывают о врагах ближе этой дистанции
+function tankVisible(t) {
+  return t.team !== 'enemy' || t.discovered || t.revealedT > 0;
+}
+function updateRecon(dt) {
+  for (const t of tanks) {
+    if (t.team !== 'enemy' || !t.alive) continue;
+    if (t.revealedT > 0) t.revealedT -= dt;
+    if (t.discovered) continue;
+    if (Math.hypot(player.x - t.x, player.z - t.z) < VIEW_RANGE) { t.discovered = true; continue; }
+    for (const a of tanks) {
+      if (a.team === 'ally' && a.alive && Math.hypot(a.x - t.x, a.z - t.z) < ALLY_VIEW) { t.discovered = true; break; }
+    }
+  }
+}
+
+/* ============ СТРЕЛЬБА ============ */
+function fireDirect(t, el) {
+  const len = (t.cls.barrelLen || 46) * (t.cls.scale || 1) * 0.9 + 6;
+  const bx = t.x + Math.cos(t.turret) * len;
+  const bz = t.z + Math.sin(t.turret) * len;
+  const by = heightAt(t.x, t.z) + 31;
+  const bulletCol = t.team === 'player' ? 0xfff3c4 : t.team === 'ally' ? 0x9fd0ff : 0xff9d5e;
+  const mesh = new THREE.Mesh(sharedGeo.bullet, new THREE.MeshBasicMaterial({ color: bulletCol }));
+  mesh.position.set(bx, by, bz);
+  fxGroup.add(mesh);
+  bullets.push({
+    mesh, x: bx, y: by, z: bz, team: t.team, dmg: t.dmg, pen: t.pen, life: 2.2, kind: 'direct',
+    vx: Math.cos(t.turret) * Math.cos(el) * SHELL_SPEED,
+    vy: Math.sin(el) * SHELL_SPEED,
+    vz: Math.sin(t.turret) * Math.cos(el) * SHELL_SPEED
+  });
+  muzzleFlash(t, bx, by, bz);
+  if (t.team === 'enemy') t.revealedT = 4;   // выстрел выдаёт позицию
+  t.recoil = 1;
+  if (t.clipSize > 0) {
+    t.clipLeft--;
+    if (t.clipLeft <= 0 && !t.cls.cycle) { t.magState = 'reloading'; t.fireT = t.cls.clipReload; }
+    else { t.magState = 'ready'; t.fireT = t.cls.between; t.cycleAcc = 0; }
+  } else {
+    t.fireT = t.cooldown;
+  }
+  sfxShot((t.cls.type === 'heavy' || t.cls.type === 'td') ? 2 : 1);
+}
+// эволюция магазина: перезарядка барабана / догрузка циклического
+function updateMag(t, dt) {
+  t.fireT -= dt;
+  if (!t.clipSize) return;
+  if (t.magState === 'reloading') {
+    if (t.fireT <= 0) { t.magState = 'ready'; t.clipLeft = t.clipSize; t.fireT = 0; }
+  } else if (t.cls.cycle && t.clipLeft < t.clipSize) {
+    t.cycleAcc += dt;
+    if (t.cycleAcc >= t.cls.cycleStep) { t.cycleAcc = 0; t.clipLeft++; }
+  }
+}
+function canFire(t) {
+  return t.fireT <= 0 && (!t.clipSize || (t.magState === 'ready' && t.clipLeft > 0));
+}
+function muzzleFlash(t, bx, by, bz) {
+  flashSprite.position.set(bx, by, bz); flashSprite.visible = true; flashT = 0.09;
+  flashLight.position.set(bx, by + 4, bz); flashLight.intensity = 3;
+}
+function fire(t, arcTargetX, arcTargetZ) {
+  fireDirect(t, t.el);
+}
+
+function splashDamage(b) {
+  explosion(b.x, b.z, true);
+  for (const t of tanks) {
+    if (!t.alive) continue;
+    const foe = b.team === 'enemy'
+      ? (t.team === 'player' || t.team === 'ally')
+      : t.team === 'enemy';
+    if (!foe) continue;
+    const d = Math.hypot(b.x - t.x, b.z - t.z);
+    if (d < b.splashR) {
+      applyDamage(t, b.dmg * (1 - d / b.splashR * 0.6), t.x, 30, t.z, b.team);
+    }
+  }
+}
+
+/* ============ ИИ ВРАГА ============ */
+const PREF_DIST = { light: 280, medium: 330, heavy: 300, td: 560 };
+function updateAI(t, dt) {
+  const ai = t.ai;
+  // антизастревание: если танк 1.6 с не сдвинулся — случайный манёвр вбок
+  ai.stuckT = (ai.stuckT || 0) + dt;
+  if (Math.abs(t.x - (ai.lastX || t.x)) + Math.abs(t.z - (ai.lastZ || t.z)) > 4) {
+    ai.lastX = t.x; ai.lastZ = t.z; ai.stuckT = 0;
+  }
+  if (ai.stuckT > 1.6) {
+    ai.evade = rand(0, 6.28);
+    ai.evadeT = rand(0.8, 1.6);
+    ai.stuckT = 0; ai.lastX = t.x; ai.lastZ = t.z;
+  }
+  if (ai.evadeT > 0) ai.evadeT -= dt;
+  // выбор цели: враги атакуют игрока и союзников, союзники — врагов
+  let target = null, d = Infinity;
+  for (const o of tanks) {
+    if (!o.alive || o === t) continue;
+    const foe = t.team === 'enemy' ? (o.team === 'player' || o.team === 'ally') : (o.team === 'enemy');
+    if (!foe) continue;
+    // союзники не видят необнаруженных врагов
+    if (t.team === 'ally' && o.team === 'enemy' && !tankVisible(o)) continue;
+    const dd = Math.hypot(o.x - t.x, o.z - t.z);
+    if (dd < d) { d = dd; target = o; }
+  }
+  const cls = t.cls;
+  ai.t -= dt;
+
+  if (!target || t.team === 'ally') {
+    // союзник без целей или превосходящий врага — держится рядом с игроком
+    const dp = Math.hypot(player.x - t.x, player.z - t.z);
+    const go = Math.atan2(player.z - t.z, player.x - t.x);
+    let moveDir;
+    if (dp > 380) moveDir = go;
+    else if (dp < 130) moveDir = go + Math.PI;
+    else if (target) {
+      moveDir = Math.atan2(target.z - t.z, target.x - t.x);
+      if (Math.hypot(target.x - t.x, target.z - t.z) < 300) moveDir += Math.PI;
+    } else {
+      ai.strafeT = (ai.strafeT || 0) - dt;
+      if (ai.strafeT <= 0) { ai.strafeDir *= -1; ai.strafeT = rand(1.5, 3.5); }
+      moveDir = go + Math.PI / 2 * ai.strafeDir;
+    }
+    const look = 90;
+    const px = t.x + Math.cos(moveDir) * look, pz = t.z + Math.sin(moveDir) * look;
+    if (wallBlocking(px, pz, TANK_R)) moveDir += Math.PI / 2 * (ai.strafeDir || 1);
+    t.angle = rotateToward(t.angle, moveDir, cls.hullSpeed * DEG * dt);
+    if (target) {
+      const goal = Math.atan2(target.z - t.z, target.x - t.x);
+      ai.aimErr = Math.max(0.05, ai.aimErr - dt * 0.5);
+      t.turret = rotateToward(t.turret, goal + ai.aimErr * rand(-1, 1), cls.turretSpeed * DEG * dt);
+      updateMag(t, dt);
+      const dd = Math.hypot(target.x - t.x, target.z - t.z);
+      if (Math.abs(angNorm(t.turret - goal)) < 0.12 && dd < 900 && canFire(t) && Math.random() < dt * 1.6) {
+        fireDirect(t, 0.02);
+      }
+    } else {
+      t.turret = rotateToward(t.turret, t.angle, 90 * DEG * dt);
+    }
+    const sx = t.x + Math.cos(moveDir) * t.speed * dt;
+    const sz = t.z + Math.sin(moveDir) * t.speed * dt;
+    let moved = false;
+    if (!wallBlocking(sx, sz, TANK_R - 2)) { t.x = sx; t.z = sz; moved = true; }
+    t.wheelVel = moved ? t.speed : 0;
+    resolveTankWalls(t);
+    return;
+  }
+
+  const dx = target.x - t.x, dz = target.z - t.z;
+  const goal = Math.atan2(dz, dx);
+  const pref = PREF_DIST[t.cls.type] || 330;
+
+  let moveDir;
+  if (d > pref + 240) moveDir = goal;
+  else if (d < pref - 80) moveDir = goal + Math.PI;
+  else {
+    // лёгкое «виляние» лицом к цели (а не боком) — по врагу можно попасть
+    ai.weaveT = (ai.weaveT || 0) - dt;
+    if (ai.weaveT <= 0) { ai.weave = rand(-0.5, 0.5); ai.weaveT = rand(0.7, 1.5); }
+    moveDir = goal + (ai.weave || 0);
+  }
+  const look = 90;
+  const px = t.x + Math.cos(moveDir) * look, pz = t.z + Math.sin(moveDir) * look;
+  if (wallBlocking(px, pz, TANK_R) ||
+      tanks.some(o => o !== t && o.alive && Math.hypot(px - o.x, pz - o.z) < TANK_R * 2)) {
+    moveDir += Math.PI / 2 * (ai.strafeDir || 1);
+  }
+  t.angle = rotateToward(t.angle, moveDir, cls.hullSpeed * DEG * dt);
+
+  // прицеливание
+  const inRange = d < 950;
+  if (inRange) ai.aimErr = Math.max(0.08, ai.aimErr - dt * 0.6);
+  else ai.aimErr = Math.min(0.9, ai.aimErr + dt * 0.5);
+  const err = ai.aimErr * rand(-1, 1) + (d > 600 ? 0.12 : 0.02);
+  let gunTarget = goal + err;
+  if (cls.sector) {
+    const rel = clamp(angNorm(gunTarget - t.angle), -cls.sector * DEG, cls.sector * DEG);
+    gunTarget = t.angle + rel;
+  }
+  t.turret = rotateToward(t.turret, gunTarget, cls.turretSpeed * DEG * dt);
+
+  // огонь
+  updateMag(t, dt);
+  const aimed = Math.abs(angNorm(t.turret - gunTarget)) < 0.1;
+  if (aimed && inRange && canFire(t) && Math.random() < dt * 2.2) {
+    fireDirect(t, 0.02);
+  }
+
+  const sx = t.x + Math.cos(moveDir) * t.speed * dt;
+  const sz = t.z + Math.sin(moveDir) * t.speed * dt;
+  let moved = false;
+  if (!wallBlocking(sx, sz, TANK_R - 2)) { t.x = sx; t.z = sz; moved = true; }
+  t.wheelVel = moved ? t.speed : 0;
+  resolveTankWalls(t);
+}
+
+/* ============ ОБНОВЛЕНИЕ ============ */
+let lastTime = performance.now();
+function update(dt) {
+  if (state === 'net') { netUpdate(dt); return; }
+  if (state !== 'playing') return;
+  const cls = player.cls;
+
+  // танковое управление: A/D — поворот корпуса (и на месте), W/S — вперёд/назад
+  let turnIn = 0;
+  if (keys['KeyA'] || keys['ArrowLeft']) turnIn -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) turnIn += 1;
+  if (turnIn) {
+    const onSpot = !(keys['KeyW'] || keys['ArrowUp'] || keys['KeyS'] || keys['ArrowDown']);
+    player.angle = angNorm(player.angle + turnIn * cls.hullSpeed * DEG * (onSpot ? 1.6 : 1) * dt);
+  }
+  let drive = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) drive += 1;
+  if (keys['KeyS'] || keys['ArrowDown']) drive -= 0.55;
+  const moving = drive !== 0;
+  if (moving) {
+    const sp = player.speed * drive * dt;
+    const nx = player.x + Math.cos(player.angle) * sp;
+    const nz = player.z + Math.sin(player.angle) * sp;
+    if (!wallBlocking(nx, nz, TANK_R - 2)) { player.x = nx; player.z = nz; player.wheelVel = Math.abs(player.speed * drive); }
+    else player.wheelVel = 0;
+    if (Math.random() < dt * 3)
+      addParticle('smoke', player.x - Math.cos(player.angle) * 24, heightAt(player.x, player.z) + 20, player.z - Math.sin(player.angle) * 24, 0, 8, 0, 0.5, 12, 6, 0x888888);
+  } else {
+    player.wheelVel *= Math.max(0, 1 - dt * 8);
+  }
+  resolveTankWalls(player);
+
+  // прицел: луч мыши пересекает рельеф местности
+  raycaster.setFromCamera(new THREE.Vector2((mouse.x / window.innerWidth) * 2 - 1, -(mouse.y / window.innerHeight) * 2 + 1), camera);
+  const gHit = raycaster.intersectObject(ground, false);
+  if (gHit.length) {
+    aimPoint.copy(gHit[0].point);
+    const dx = aimPoint.x - player.x, dz = aimPoint.z - player.z;
+    const hd = Math.hypot(dx, dz);
+    const desired = Math.atan2(dz, dx);
+    let gunTarget = desired;
+    if (cls.sector) {
+      const rel = clamp(angNorm(desired - player.angle), -cls.sector * DEG, cls.sector * DEG);
+      gunTarget = player.angle + rel;
+    }
+    player.turret = rotateToward(player.turret, gunTarget, cls.turretSpeed * DEG * dt);
+
+    aimRing.visible = false;
+    // угол возвышения с учётом разницы высот
+    const hP = heightAt(player.x, player.z) + 31;
+    player.el = clamp(Math.atan2(aimPoint.y - hP, Math.max(hd, 60)), -0.5, -0.02);
+  } else {
+    aimRing.visible = false;
+  }
+
+  // огонь
+  updateMag(player, dt);
+  if ((mouse.down || keys['Space']) && canFire(player)) {
+    fireDirect(player, player.el);
+  }
+
+  // отдача
+  player.recoil = Math.max(0, player.recoil - dt * 5);
+
+  // враги
+  for (const t of tanks) if (t.alive && t.ai) updateAI(t, dt);
+  resolveTankPairs();
+  for (const t of tanks) resolveTankWalls(t);
+  updateRecon(dt);
+
+  // снаряды
+  for (const b of bullets) {
+    if (b.dead) continue;
+    if (b.kind === 'direct') {
+      b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      b.mesh.position.set(b.x, b.y, b.z);
+      b.life -= dt;
+      if (b.life <= 0) { b.dead = true; continue; }
+      let hit = false;
+      for (const w of walls) {
+        const wH = heightAt(w.x + w.w / 2, w.y + w.h / 2);
+        if (circleRectHit(b.x, b.z, 6, w) && b.y < wH + 70) {
+          if (w.crate) {
+            w.hp -= 1;
+            if (w.hp <= 0) {
+              wallsGroup.remove(w.mesh);
+              w.dead = true;
+              explosion(b.x, b.z, false);
+            } else {
+              w.mat.color.multiplyScalar(0.7);
+              sparks(b.x, b.y, b.z, 10, 0xd8a35e);
+              sfxCrate();
+            }
+          } else {
+            sparks(b.x, b.y, b.z, 6, 0xcfcfc0);
+          }
+          hit = true; break;
+        }
+      }
+      walls = walls.filter(w => !w.dead);
+      if (hit) { b.dead = true; continue; }
+      for (const t of tanks) {
+        // дружественный огонь запрещён: бить можно только противника
+        if (!t.alive || t.team === b.team) continue;
+        const foe = b.team === 'enemy'
+          ? (t.team === 'player' || t.team === 'ally')
+          : t.team === 'enemy';
+        if (!foe) continue;
+        const tH = heightAt(t.x, t.z);
+        if (Math.hypot(b.x - t.x, b.z - t.z) < TANK_R + 12 && b.y > tH - 4 && b.y < tH + 60) {
+          // обнаружение: враг, в которого попали — подсвечен
+          if (t.team === 'enemy') { t.discovered = true; t.revealedT = 6; }
+          // зона попадания: снаряд перед носом → лоб, сзади → корма, иначе борт
+          const brg = angNorm(Math.atan2(b.z - t.z, b.x - t.x) - t.angle);
+          const zone = Math.abs(brg) < 0.6 ? 'front' : Math.abs(brg) > 2.5 ? 'rear' : 'side';
+          const armor = t.armor[zone];
+          // пробитие: случайный фактор ±15%, спереди у тяжей толсто, у ЛТ всё насквозь
+          const roll = b.pen * rand(0.85, 1.15);
+          if (roll >= armor) {
+            // пробитие: полный урон
+            applyDamage(t, b.dmg, b.x, b.y, b.z, b.team);
+            sparks(b.x, b.y, b.z, 14, 0xffcf6e);
+          } else {
+            // рикошет/не пробил: малый урон (осколки), видно вспышку и искры
+            applyDamage(t, b.dmg * 0.15, b.x, b.y, b.z, b.team);
+            sparks(b.x, b.y, b.z, 10, 0xcfcfc0);
+          }
+          b.dead = true;
+          break;
+        }
+      }
+      if (!b.dead && b.y < heightAt(b.x, b.z) + 1) {
+        explosion(b.x, b.z, false);
+        b.dead = true;
+      }
+    } else if (b.kind === 'arc') {
+      b.t += dt;
+      b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      b.mesh.position.set(b.x, b.y, b.z);
+      if (b.t >= b.dur || b.y <= 0.5) {
+        splashDamage(b);
+        b.dead = true;
+      }
+    }
+  }
+  bullets = bullets.filter(b => { if (b.dead) { fxGroup.remove(b.mesh); b.mesh.material.dispose(); return false; } return true; });
+  tanks = tanks.filter(t => t.alive);
+
+  // волны
+  if (!tanks.some(t => t.team === 'enemy')) {
+    waveTimer -= dt;
+    if (waveTimer <= 0) {
+      wave += 1;
+      const areaF = Math.max(1, (ARENA_W * ARENA_H) / (2400 * 1600));
+      const n = Math.round((2 + wave) * areaF);
+      for (let i = 0; i < n; i++) {
+        const m = {
+          hp: 1 + (wave - 1) * 0.12,
+          dmg: 0.35 + (wave - 1) * 0.03,
+          cd: Math.max(2.0, 3.4 * Math.pow(0.93, wave - 1)),
+          speed: 1 + Math.min(0.35, (wave - 1) * 0.04)
+        };
+        spawnEnemy(m);
+      }
+      waveTimer = 3.5;
+      if (wave > 1) {
+        player.hp = Math.min(player.maxHp, player.hp + 25);
+        score += 50;
+      }
+      spawnAllies();
+      const premMul = player.cls.premium ? 1.5 : 1;
+      const wc = Math.round(150 * premMul);
+      save.money += wc; sessionEarned += wc;
+      if (wave % 5 === 0) { const g = player.cls.premium ? 3 : 2; save.gold += g; sessionGold += g; }
+      persistSave();
+    }
+  }
+
+  // частицы
+  for (const p of particles) {
+    p.life -= dt;
+    p.sp.position.x += p.vx * dt;
+    p.sp.position.y += p.vy * dt;
+    p.sp.position.z += p.vz * dt;
+    const k = clamp(p.life / p.maxLife, 0, 1);
+    if (p.kind === 'spark') {
+      p.vx *= Math.pow(0.02, dt); p.vz *= Math.pow(0.02, dt);
+      p.vy -= 500 * dt;
+      p.sp.material.opacity = k * p.base;
+    } else if (p.kind === 'smoke') {
+      p.vy += 24 * dt;
+      const sc = p.size + p.grow * (1 - k);
+      p.sp.scale.set(sc, sc, 1);
+      p.sp.material.opacity = k * p.base;
+    } else {
+      const sc = p.size + p.grow * (1 - k);
+      p.sp.scale.set(sc, sc, 1);
+      p.sp.material.opacity = k * p.base;
+    }
+  }
+  particles = particles.filter(p => { if (p.life <= 0) { fxGroup.remove(p.sp); p.sp.material.dispose(); return false; } return true; });
+
+  // декали
+  for (const d of decals) { d.life -= dt; d.m.material.opacity = 0.4 * clamp(d.life / d.maxLife, 0, 1); }
+  decals = decals.filter(d => d.life > 0);
+
+  // вспышка
+  if (flashT > 0) { flashT -= dt; flashSprite.material.opacity = clamp(flashT / 0.09, 0, 1) * 0.95; if (flashT <= 0) flashSprite.visible = false; }
+  flashLight.intensity *= Math.pow(0.001, dt);
+  if (flashLight.intensity < 0.05) flashLight.intensity = 0;
+
+  // камера
+  const off = clamp(angNorm(player.turret - player.angle) * 0.35, -0.4, 0.4);
+  camYaw = angLerp(camYaw, player.angle + off, dt * 2.5);
+  shake = Math.max(0, shake - dt * 30);
+}
+
+function spawnEnemy(m) {
+  let x, z, tries = 0;
+  do {
+    const side = Math.floor(rand(0, 4));
+    if (side === 0) { x = rand(80, ARENA_W - 80); z = rand(80, 200); }
+    else if (side === 1) { x = rand(80, ARENA_W - 80); z = ARENA_H - rand(80, 200); }
+    else if (side === 2) { x = rand(80, 200); z = rand(80, ARENA_H - 80); }
+    else { x = ARENA_W - rand(80, 200); z = rand(80, ARENA_H - 80); }
+    tries++;
+  } while (Math.hypot(x - player.x, z - player.z) < 500 && tries < 30);
+  // враги — техника примерно текущего уровня волны, любые нации
+  const lo = Math.max(1, wave - 1), hi = Math.min(8, wave + 1);
+  const pool = Object.keys(VEHICLES).filter(id => VEHICLES[id].tier >= lo && VEHICLES[id].tier <= hi);
+  const cId = pool[Math.floor(Math.random() * pool.length)] || 'ussr_1';
+  const t = makeTank(x, z, 'enemy', cId, m);
+  tanks.push(t);
+}
+
+/* ============ СЕТЕВОЙ БОЙ ============ */
+function netStart() {
+  if (net) return;
+  ensureAudio();
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const addr = netAddr();
+  if (!addr) return;   // поле адреса пустое — уже показано окно ввода
+  const ws = new WebSocket(proto + '://' + addr);
+  net = { ws, selfId: null, units: {}, bMeshes: {}, inAcc: 0, wave: 0, ready: false, fireT: 0, left: false };
+  state = 'net';
+  document.getElementById('hangar').style.display = 'none';
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('pause').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('tankName').textContent = 'СЕТЕВОЙ БОЙ: подключение…';
+  document.getElementById('waveText').textContent = 'ПОДКЛЮЧЕНИЕ…';
+  ws.onopen = () => { try { ws.send(JSON.stringify({ t: 'join', veh: save.selected })); } catch (e) {} };
+  ws.onmessage = ev => {
+    let d; try { d = JSON.parse(ev.data); } catch (e) { return; }
+    if (d.t === 'init') netInit(d);
+    else if (d.t === 'st') netApplySt(d);
+    else if (d.t === 'fxs') netApplyFx(d.items);
+  };
+  ws.onclose = () => {
+    if (net && !net.left) {
+      const wasReady = net.ready;
+      netLeave();
+      showModal('Сетевой бой', wasReady
+        ? 'Соединение с сервером потеряно.'
+        : 'Сервер не отвечает. Запустите server.py (порт 8765) и попробуйте снова.');
+    }
+  };
+  ws.onerror = () => {};
+}
+
+function netInit(d) {
+  if (!net) return;
+  net.selfId = d.self;
+  net.map = d.map;
+  net.ready = true;
+  while (tanksGroup.children.length) tanksGroup.remove(tanksGroup.children[0]);
+  while (fxGroup.children.length) { const c = fxGroup.children[0]; if (c.material && c.material.dispose) c.material.dispose(); fxGroup.remove(c); }
+  fxGroup.add(flashSprite);
+  tanks = []; bullets = []; particles = []; decals = [];
+  net.units = {}; net.bMeshes = {};
+  setMap(MAPS[0]);   // сервер шлёт холмы/стены — клиент строит по ним
+  const base = VEHICLES[save.selected];
+  const st = effStats(save.selected);
+  player = makeTank(ARENA_W / 2, ARENA_H / 2, 'player', save.selected, {
+    hp: st.hp / base.hp, dmg: st.dmg / base.dmg, cd: st.cd / base.cd, speed: st.speed / base.speed
+  });
+  player.cls = Object.assign({}, base, st);
+  tanks.push(player);
+  net.fireT = 0;
+  score = 0; kills = 0; wave = 0; shake = 0; sessionEarned = 0; sessionGold = 0;
+  document.getElementById('tankName').textContent =
+    '🌐 ' + (base.premium ? '★ ' : '') + TYPE_LABELS[base.type] + ' ' + base.name;
+  document.getElementById('waveText').textContent = 'ВОЛНА ' + wave;
+}
+
+function netLeave() {
+  if (net) { net.left = true; try { net.ws.close(); } catch (e) {} net = null; }
+  while (tanksGroup.children.length) tanksGroup.remove(tanksGroup.children[0]);
+  while (fxGroup.children.length) { const c = fxGroup.children[0]; if (c.material && c.material.dispose) c.material.dispose(); fxGroup.remove(c); }
+  fxGroup.add(flashSprite);
+  tanks = []; bullets = []; particles = []; decals = [];
+  player = null;
+  state = 'hangar';
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('pause').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('hangar').style.display = '';
+  setMap(MAPS.find(m => m.id === mapId) || MAPS[0]);
+  buildPreview();
+}
+
+function netSendIn(f) {
+  if (!net || !net.ready || !player || !player.alive) return;
+  try {
+    net.ws.send(JSON.stringify({
+      t: 'in', x: Math.round(player.x), z: Math.round(player.z),
+      a: +player.angle.toFixed(3), tu: +player.turret.toFixed(3), el: +player.el.toFixed(3),
+      f: f ? 1 : 0
+    }));
+  } catch (e) {}
+}
+
+function netApplySt(d) {
+  if (!net || !net.ready) return;
+  net.wave = d.w; wave = d.w;
+  document.getElementById('waveText').textContent = 'ВОЛНА ' + d.w;
+  const seen = new Set();
+  for (const p of d.pts) {
+    seen.add(p.i);
+    if (p.i === net.selfId) {
+      if (!player) continue;
+      player.alive = p.al; player.hp = p.h; player.maxHp = p.mh;
+      if (p.al) {
+        const dx = p.x - player.x, dz = p.z - player.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 90) { player.x = p.x; player.z = p.z; }
+        else if (dist > 0.5) { player.x += dx * 0.4; player.z += dz * 0.4; }
+        if (Math.abs(angNorm(p.a - player.angle)) > 0.3) player.angle = p.a;
+      }
+      continue;
+    }
+    let t = net.units[p.i];
+    if (!t) {
+      t = makeTank(p.x, p.z, p.tm === 'enemy' ? 'enemy' : 'ally', p.v, {});
+      t.netId = p.i;
+      if (t.team === 'enemy') t.discovered = true;   // в сети все видны
+      net.units[p.i] = t;
+    }
+    t.x = p.x; t.z = p.z; t.angle = p.a; t.turret = p.tu; t.el = p.el;
+    t.hp = p.h; t.maxHp = p.mh; t.alive = p.al;
+    t.model.group.visible = p.al;
+    if (t.barBg) { t.barBg.visible = t.barFg.visible = p.al; }
+  }
+  for (const id in net.units) {
+    if (!seen.has(id)) {
+      const t = net.units[id];
+      tanksGroup.remove(t.model.group);
+      if (t.barBg) { fxGroup.remove(t.barBg); fxGroup.remove(t.barFg); }
+      delete net.units[id];
+    }
+  }
+  const bseen = new Set();
+  for (const b of d.bs) {
+    bseen.add(b.i);
+    let mb = net.bMeshes[b.i];
+    if (!mb) {
+      const mesh = new THREE.Mesh(sharedGeo.bullet, new THREE.MeshBasicMaterial({ color: 0xffd28e }));
+      mesh.position.set(b.x, b.y, b.z);
+      fxGroup.add(mesh);
+      mb = { mesh };
+      net.bMeshes[b.i] = mb;
+    }
+    mb.mesh.position.set(b.x, b.y, b.z);
+  }
+  for (const id in net.bMeshes) {
+    if (!bseen.has(id)) {
+      fxGroup.remove(net.bMeshes[id].mesh);
+      net.bMeshes[id].mesh.material.dispose();
+      delete net.bMeshes[id];
+    }
+  }
+}
+
+function fxMuzzleAt(x, y, z) {
+  flashSprite.position.set(x, y, z); flashSprite.visible = true; flashT = 0.09;
+  flashLight.position.set(x, y + 4, z); flashLight.intensity = 2;
+}
+
+function netApplyFx(items) {
+  if (!net) return;
+  for (const e of items) {
+    if (e.k === 'wave') {
+      wave = e.w;
+      document.getElementById('waveText').textContent = 'ВОЛНА ' + e.w;
+      if (e.w > 1) {
+        score += 50;
+        const premMul = player.cls.premium ? 1.5 : 1;
+        const wc = Math.round(150 * premMul);
+        save.money += wc; sessionEarned += wc;
+        if (e.w % 5 === 0) { const g = player.cls.premium ? 3 : 2; save.gold += g; sessionGold += g; }
+        persistSave();
+      }
+    } else if (e.k === 'fire') {
+      if (e.i === net.selfId && player) muzzleFlash(player, e.x, e.y, e.z);
+      else fxMuzzleAt(e.x, e.y, e.z);
+      const dd = player ? Math.hypot(e.x - player.x, e.z - player.z) : 0;
+      if (dd < 900) sfxShot(1);
+    } else if (e.k === 'boom') {
+      explosion(e.x, e.z, false);
+    } else if (e.k === 'spark') {
+      sparks(e.x, e.y, e.z, e.c === 'gold' ? 14 : 10, e.c === 'gold' ? 0xffcf6e : 0xcfcfc0);
+    } else if (e.k === 'kill') {
+      if (e.by === 'player') {
+        kills += 1;
+        score += 100 + wave * 25;
+        const premMul = player.cls.premium ? 1.5 : 1;
+        const c = Math.round((e.money || 80) * premMul);
+        save.money += c; sessionEarned += c;
+        persistSave();
+      } else {
+        score += 10; save.money += 15; sessionEarned += 15; persistSave();
+      }
+    } else if (e.k === 'dead') {
+      if (e.i === net.selfId) {
+        document.getElementById('overTitle').textContent = 'ВЫ ПОДБИТЫ!';
+        document.getElementById('overStats').textContent = 'Возрождение через несколько секунд…';
+        document.getElementById('gameover').classList.remove('hidden');
+      }
+    } else if (e.k === 'respawn') {
+      if (e.i === net.selfId) document.getElementById('gameover').classList.add('hidden');
+    }
+  }
+}
+
+function updateNetFx(dt) {
+  for (const p of particles) {
+    p.life -= dt;
+    p.sp.position.x += p.vx * dt;
+    p.sp.position.y += p.vy * dt;
+    p.sp.position.z += p.vz * dt;
+    const k = clamp(p.life / p.maxLife, 0, 1);
+    if (p.kind === 'spark') {
+      p.vx *= Math.pow(0.02, dt); p.vz *= Math.pow(0.02, dt);
+      p.vy -= 500 * dt;
+      p.sp.material.opacity = k * p.base;
+    } else if (p.kind === 'smoke') {
+      p.vy += 24 * dt;
+      const sc = p.size + p.grow * (1 - k);
+      p.sp.scale.set(sc, sc, 1);
+      p.sp.material.opacity = k * p.base;
+    } else {
+      const sc = p.size + p.grow * (1 - k);
+      p.sp.scale.set(sc, sc, 1);
+      p.sp.material.opacity = k * p.base;
+    }
+  }
+  particles = particles.filter(p => { if (p.life <= 0) { fxGroup.remove(p.sp); p.sp.material.dispose(); return false; } return true; });
+  for (const d of decals) { d.life -= dt; d.m.material.opacity = 0.4 * clamp(d.life / d.maxLife, 0, 1); }
+  decals = decals.filter(d => d.life > 0);
+  if (flashT > 0) { flashT -= dt; flashSprite.material.opacity = clamp(flashT / 0.09, 0, 1) * 0.95; if (flashT <= 0) flashSprite.visible = false; }
+  flashLight.intensity *= Math.pow(0.001, dt);
+  if (flashLight.intensity < 0.05) flashLight.intensity = 0;
+  if (player) {
+    const off = clamp(angNorm(player.turret - player.angle) * 0.35, -0.4, 0.4);
+    camYaw = angLerp(camYaw, player.angle + off, dt * 2.5);
+  }
+  shake = Math.max(0, shake - dt * 30);
+}
+
+function netUpdate(dt) {
+  if (!player) { updateNetFx(dt); return; }
+  const cls = player.cls;
+  let turnIn = 0;
+  if (keys['KeyA'] || keys['ArrowLeft']) turnIn -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) turnIn += 1;
+  if (turnIn) {
+    const onSpot = !(keys['KeyW'] || keys['ArrowUp'] || keys['KeyS'] || keys['ArrowDown']);
+    player.angle = angNorm(player.angle + turnIn * cls.hullSpeed * DEG * (onSpot ? 1.6 : 1) * dt);
+  }
+  let drive = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) drive += 1;
+  if (keys['KeyS'] || keys['ArrowDown']) drive -= 0.55;
+  const moving = drive !== 0 && player.alive;
+  if (moving) {
+    const sp = player.speed * drive * dt;
+    const nx = player.x + Math.cos(player.angle) * sp;
+    const nz = player.z + Math.sin(player.angle) * sp;
+    if (!wallBlocking(nx, nz, TANK_R - 2)) { player.x = nx; player.z = nz; player.wheelVel = Math.abs(player.speed * drive); }
+    else player.wheelVel = 0;
+  } else {
+    player.wheelVel *= Math.max(0, 1 - dt * 8);
+  }
+  resolveTankWalls(player);
+  player.recoil = Math.max(0, player.recoil - dt * 5);
+
+  // прицел: луч мыши пересекает рельеф
+  raycaster.setFromCamera(new THREE.Vector2((mouse.x / window.innerWidth) * 2 - 1, -(mouse.y / window.innerHeight) * 2 + 1), camera);
+  const gHit = raycaster.intersectObject(ground, false);
+  if (gHit.length) {
+    aimPoint.copy(gHit[0].point);
+    const dx = aimPoint.x - player.x, dz = aimPoint.z - player.z;
+    const hd = Math.hypot(dx, dz);
+    const desired = Math.atan2(dz, dx);
+    let gunTarget = desired;
+    if (cls.sector) {
+      const rel = clamp(angNorm(desired - player.angle), -cls.sector * DEG, cls.sector * DEG);
+      gunTarget = player.angle + rel;
+    }
+    player.turret = rotateToward(player.turret, gunTarget, cls.turretSpeed * DEG * dt);
+    const hP = heightAt(player.x, player.z) + 31;
+    player.el = clamp(Math.atan2(aimPoint.y - hP, Math.max(hd, 60)), -0.5, -0.02);
+  }
+
+  // огонь: сервер проверит перезарядку и вернёт fx fire
+  net.fireT -= dt;
+  if ((mouse.down || keys['Space']) && player.alive && net.fireT <= 0) {
+    netSendIn(true);
+    net.fireT = cls.clipSize ? (cls.between || 0.8) : cls.cooldown;
+    player.recoil = 1;
+  }
+  net.inAcc += dt;
+  if (net.inAcc >= 0.05) { net.inAcc = 0; netSendIn(false); }
+  updateNetFx(dt);
+}
+
+/* ============ РЕНДЕР ============ */
+function syncTankMesh(t) {
+  const vis = tankVisible(t);
+  t.model.group.visible = vis;
+  // высота по мешу земли, а не по аналитической heightAt (иначе танк парит над/тонет в склонах)
+  const h = groundHeightAt(t.x, t.z);
+  t.model.group.position.set(t.x, h, t.z);
+  // наклон корпуса по склону: pitch (нос вверх/вниз) и roll (крен)
+  const d = 15;
+  const hF = groundHeightAt(t.x + Math.cos(t.angle) * d, t.z + Math.sin(t.angle) * d);
+  const hB = groundHeightAt(t.x - Math.cos(t.angle) * d, t.z - Math.sin(t.angle) * d);
+  const hL = groundHeightAt(t.x + Math.sin(t.angle) * d, t.z - Math.cos(t.angle) * d);
+  const hR = groundHeightAt(t.x - Math.sin(t.angle) * d, t.z + Math.cos(t.angle) * d);
+  t.model.group.rotation.order = 'YZX';
+  t.model.group.rotation.y = -t.angle;
+  t.model.group.rotation.z = Math.atan2(hF - hB, 2 * d);
+  t.model.group.rotation.x = Math.atan2(hL - hR, 2 * d);
+  t.turretPivot.rotation.y = t.angle - t.turret;
+  t.barrelPivot.rotation.z = t.el;
+  t.barrelPivot.position.x = -7 * t.recoil;
+  if (t.wheels.length) {
+    const spin = t.wheelVel * 0.016 / 4.4;
+    for (const w of t.wheels) w.rotation.z += spin;
+  }
+  if (t.barBg) {
+    t.barBg.position.set(t.x, h + 62, t.z);
+    t.barFg.position.set(t.x, h + 62, t.z);
+    const frac = clamp(t.hp / t.maxHp, 0, 1);
+    t.barFg.scale.x = 50 * frac;
+    t.barBg.visible = t.barFg.visible = vis && t.hp < t.maxHp;
+  }
+}
+
+function draw() {
+  if (state === 'hangar' || state === 'gameover') {
+    hangarT += 0.016;
+    const a = hangarUserYaw !== null ? hangarUserYaw : hangarT * 0.25;
+    // камера осмотра следит за моделью танка (за её фактической высотой на меше земли)
+    const pg = previewTank && previewTank.group;
+    const tx = pg ? pg.position.x : ARENA_W / 2;
+    const tz = pg ? pg.position.z : ARENA_H / 2;
+    const th = pg ? pg.position.y : heightAt(tx, tz);
+    // вид сверху-сбоку под углом, дистанция под размер модели
+    let pad = 80, padH = 115;
+    if (pg) {
+      const s = new THREE.Box3().setFromObject(pg).getSize(new THREE.Vector3());
+      const maxS = Math.max(s.x, s.z, 20);
+      pad = maxS * 1.5;
+      padH = maxS * 1.4 + 25;
+    }
+    camera.position.set(tx + Math.cos(a) * pad, th + padH, tz + Math.sin(a) * pad);
+    camera.lookAt(tx, th + 10, tz);
+  } else if (!player) {
+    // сетевой бой: ждём init сервера — камера осматривает арену
+    const hP = heightAt(ARENA_W / 2, ARENA_H / 2);
+    camera.position.set(ARENA_W / 2 - 400, hP + 220, ARENA_H / 2 - 400);
+    camera.lookAt(ARENA_W / 2, hP, ARENA_H / 2);
+  } else {
+    const pitch = 0.5, dist = 250;
+    const hP = heightAt(player.x, player.z);
+    const cx = player.x - Math.cos(camYaw) * dist * Math.cos(pitch);
+    const cz = player.z - Math.sin(camYaw) * dist * Math.cos(pitch);
+    const cy = hP + 20 + dist * Math.sin(pitch);
+    camera.position.set(cx + (shake ? rand(-shake, shake) : 0), cy + (shake ? rand(-shake, shake) * 0.5 : 0), cz + (shake ? rand(-shake, shake) : 0));
+    camera.lookAt(player.x, hP + 30, player.z);
+  }
+  for (const t of tanks) syncTankMesh(t);
+  if (net) for (const id in net.units) syncTankMesh(net.units[id]);
+  renderer.render(scene, camera);
+}
+
+/* ============ HUD ============ */
+const mmCtx = document.getElementById('minimap').getContext('2d');
+function drawHUD() {
+  if (state !== 'playing' && state !== 'paused' && state !== 'net') return;
+  if (!player) return;
+  const hp = Math.max(0, player.hp);
+  document.getElementById('hpText').textContent = `ПРОЧНОСТЬ ${Math.round(hp)} / ${player.maxHp}`;
+  document.getElementById('hpBar').style.width = (100 * hp / player.maxHp) + '%';
+  document.getElementById('hpBar').style.background = hp > 40 ? '#8fce4f' : hp > 20 ? '#e0b23f' : '#e0553f';
+  const cdMax = player.magState === 'reloading' ? player.cls.clipReload : (player.clipSize ? player.cls.between : player.cooldown);
+  document.getElementById('cdBar').style.width = (100 * clamp(1 - player.fireT / cdMax, 0, 1)) + '%';
+  // магазин (барабан / циклический)
+  const clipTrack = document.getElementById('clipTrack');
+  const clipLabel = document.getElementById('clipLabel');
+  if (player.clipSize > 0) {
+    clipTrack.classList.remove('hidden');
+    let dots = '';
+    for (let i = 0; i < player.clipSize; i++) dots += `<div class="clipDot ${i < player.clipLeft ? 'full' : ''}"></div>`;
+    clipTrack.innerHTML = dots;
+    clipLabel.textContent = player.magState === 'reloading' ? 'ПЕРЕЗАРЯДКА МАГАЗИНА…' : (player.cls.cycle ? 'ЦИКЛИЧЕСКИЙ МАГАЗИН' : 'БАРАБАН ЗАРЯЖАНИЯ');
+  } else {
+    clipTrack.classList.add('hidden');
+    clipLabel.textContent = '';
+  }
+  document.getElementById('waveText').textContent = 'ВОЛНА ' + wave;
+  document.getElementById('scoreText').textContent = 'ОЧКИ: ' + score;
+  document.getElementById('killsText').textContent = 'УНИЧТОЖЕНО: ' + kills;
+  document.getElementById('alliesText').textContent = 'СОЮЗНИКИ: ' + tanks.filter(t => t.team === 'ally').length + '/' + maxAllies();
+  document.getElementById('moneyText').textContent = 'МОНЕТЫ: ' + save.money + '   •   ЗОЛОТО: ' + save.gold;
+
+  const g = mmCtx;
+  g.clearRect(0, 0, 190, 127);
+  g.fillStyle = 'rgba(30,40,22,0.9)'; g.fillRect(0, 0, 190, 127);
+  const sc = 190 / ARENA_W;
+  for (const w of walls) {
+    g.fillStyle = w.crate ? 'rgba(160,130,70,0.8)' : 'rgba(150,150,130,0.5)';
+    g.fillRect(w.x * sc, w.y * sc, Math.max(2, w.w * sc), Math.max(2, w.h * sc));
+  }
+  for (const t of tanks) {
+    if (t.team === 'enemy' && !tankVisible(t)) continue;   // необнаруженные на миникарте не видны
+    g.fillStyle = t.team === 'player' ? '#a0e05a' : t.team === 'ally' ? '#5fa8ff' : '#ff6a4a';
+    g.beginPath(); g.arc(t.x * sc, t.z * sc, 3, 0, 6.28); g.fill();
+  }
+  if (net) for (const id in net.units) {
+    const t = net.units[id];
+    if (!t.alive) continue;
+    g.fillStyle = t.team === 'enemy' ? '#ff6a4a' : '#5fa8ff';
+    g.beginPath(); g.arc(t.x * sc, t.z * sc, 3, 0, 6.28); g.fill();
+  }
+}
+
+/* ============ ЦИКЛ ============ */
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  update(dt);
+  drawHUD();
+  draw();
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+loadSave();
+selectedVeh = save.selected;
+mapId = MAPS.some(m => m.id === save.mapId) ? save.mapId : 'field';
+setMap(MAPS.find(m => m.id === mapId));
+buildPreview();
+netAddrHint();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

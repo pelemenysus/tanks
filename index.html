@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Танковая битва 3D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh; font-family: "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #2a3a1e 0%, #131a0d 55%, #0a0e06 100%);
+    color: #e8e6d0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 40px 20px; text-align: center;
+  }
+  .logo { font-size: 13px; letter-spacing: 6px; color: #8fce4f; margin-bottom: 10px; }
+  h1 { font-size: 46px; letter-spacing: 3px; margin-bottom: 8px; color: #f2f0dc; text-shadow: 0 4px 30px rgba(140,200,80,0.25); }
+  .sub { font-size: 16px; color: #a9a790; margin-bottom: 36px; max-width: 640px; line-height: 1.6; }
+  .play {
+    display: inline-block; padding: 20px 70px; font-size: 24px; letter-spacing: 4px; text-decoration: none;
+    background: #6d8f3c; color: #f2f0dc; border: 2px solid #a5c86a; border-radius: 12px;
+    transition: background .2s, transform .1s; margin-bottom: 14px;
+  }
+  .play:hover { background: #83a94e; transform: scale(1.02); }
+  .info { max-width: 700px; background: rgba(20,26,12,0.7); border: 1px solid rgba(140,180,90,0.3); border-radius: 14px; padding: 26px 30px; margin-top: 34px; text-align: left; line-height: 1.7; font-size: 14.5px; }
+  .info h2 { font-size: 17px; color: #b7d67c; letter-spacing: 2px; margin-bottom: 10px; }
+  .info p { color: #c5c2a8; margin-bottom: 8px; }
+  .info b { color: #ffd76e; }
+  .info code { background: #101408; border: 1px solid #4a5a30; padding: 2px 7px; border-radius: 6px; color: #d8e8c0; font-size: 13.5px; }
+  .cards { display: flex; gap: 14px; margin-top: 34px; flex-wrap: wrap; justify-content: center; }
+  .card { background: rgba(20,26,12,0.7); border: 1px solid rgba(140,180,90,0.3); border-radius: 14px; padding: 20px 24px; width: 300px; text-align: left; }
+  .card h3 { color: #b7d67c; font-size: 15px; letter-spacing: 1px; margin-bottom: 8px; }
+  .card p { font-size: 13.5px; color: #c5c2a8; line-height: 1.6; }
+  .foot { margin-top: 40px; font-size: 12px; color: #6b6a58; }
+</style>
+</head>
+<body>
+  <div class="logo">🌐 ОНЛАЙН ИГРА</div>
+  <h1>ТАНКОВАЯ БИТВА 3D</h1>
+  <p class="sub">Советские, немецкие, американские и британские танки. Сотни машин от МС-1 до ИС-7, волны врагов, золото, магазины, карты — всё как в WoT, прямо в браузере.</p>
+  <a class="play" href="tanks3d.html">🎮 ИГРАТЬ</a>
+  <div class="cards">
+    <div class="card">
+      <h3>🎖 ОДИНОЧНЫЙ БОЙ</h3>
+      <p>Десятки волн врагов, награды, покупка техники за монеты, премиум-танки за золото, ежедневные подарки и рулетка удачи. Прогресс сохраняется в вашем браузере.</p>
+    </div>
+    <div class="card">
+      <h3>🌐 СЕТЕВОЙ БОЙ ВМЕСТЕ</h3>
+      <p>Играйте вдвоём кооперативом. Хозяин запускает сервер <code>server.py</code> на своём компьютере, а друг указывает его адрес: кнопка <b>«⚙ адрес сервера»</b> → <code>IP:8765</code>.</p>
+    </div>
+  </div>
+  <div class="info">
+    <h2>КАК ИГРАТЬ ВДВОЁМ</h2>
+    <p><b>1.</b> Хозяин запускает сервер сетевой игры: <code>python3 server.py</code> (порт 8765) и открывает игру у себя.</p>
+    <p><b>2.</b> Хозяин открывает этот сайт, нажимает <b>«⚙ адрес сервера»</b> и вводит <code>IP:8765</code> либо оставляет пустым (свой компьютер).</p>
+    <p><b>3.</b> Друг делает то же со своим <code>IP:8765</code> хозяина. Оба нажимают <b>«🌐 СЕТЕВОЙ БОЙ»</b> и воюют вместе против ИИ.</p>
+    <p>Порт 8765 должен быть открыт наружу (проброс порта на роутере). Всё остальное — только браузер.</p>
+  </div>
+  <div class="foot">Управление: WASD — движение, мышь — башня и прицел, ЛКМ/Пробел — огонь, P — пауза, R — заново, M — звук.</div>
+</body>
+</html>
