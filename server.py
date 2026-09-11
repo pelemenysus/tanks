@@ -117,11 +117,16 @@ waveTimer = 1.2
 bid = 0          # счётчик id снарядов
 
 # дуэль 1×1 (как в WoT)
-worldMode = 'coop'    # 'coop' | 'duel'
+worldMode = 'coop'    # 'coop' | 'duel' | 'capture'
 duelScore = {}        # id игрока -> число побед в раундах
 duelRound = 1
 duelWinner = None     # id победителя матча (до 5 побед)
 duelEndT = 0          # таймер сброса после конца матча
+
+# захват базы (как в WoT): база врага у северного края карты
+CAP = {'x': ARENA_W / 2, 'z': ARENA_H * 0.1, 'r': 130}
+capProgress = 0.0
+CAP_TIME = 35.0       # секунд на полный захват
 
 def duelSpawn(side):
     """Спавн на своей половине: side 0 — лево, 1 — право."""
@@ -241,6 +246,10 @@ def spawnEnemy():
         if live and min(math.hypot(x - p['x'], z - p['z']) for p in live) < 500:
             continue
         break
+    # в режиме захвата треть врагов — дежурные у своей базы
+    if worldMode == 'capture' and random.random() < 0.35:
+        x = CAP['x'] + random.uniform(-CAP['r'] * 0.9, CAP['r'] * 0.9)
+        z = CAP['z'] + random.uniform(20, CAP['r'] * 0.8)
     m = {
         'hp': 1 + (wave - 1) * 0.12, 'dmg': 0.35 + (wave - 1) * 0.03,
         'cd': max(2.0, 3.4 * (0.93 ** (wave - 1))), 'speed': 1 + min(0.35, (wave - 1) * 0.04)
@@ -312,7 +321,7 @@ def updateAI(t, dt):
     resolveTankWalls(t)
 
 def tick(dt):
-    global wave, waveTimer, sseq, bullets, duelEndT, duelWinner
+    global wave, waveTimer, sseq, bullets, capProgress, duelEndT, duelWinner
     # таймер сброса после конца матча дуэли
     if duelEndT > 0:
         duelEndT -= dt
@@ -393,6 +402,22 @@ def tick(dt):
             fx({'k': 'wave', 'w': wave})
     # убрать мёртвых врагов (игроки остаются — их respawn ниже)
     units[:] = [u for u in units if u['al'] or u['team'] == 'player']
+    # захват базы
+    if worldMode == 'capture':
+        inP = [u for u in units if u['team'] == 'player' and u['al'] and
+               math.hypot(u['x'] - CAP['x'], u['z'] - CAP['z']) < CAP['r']]
+        inE = [u for u in units if u['team'] == 'enemy' and u['al'] and
+               math.hypot(u['x'] - CAP['x'], u['z'] - CAP['z']) < CAP['r']]
+        if inP and not inE:
+            capProgress += dt * (100.0 / CAP_TIME)
+        elif inE:
+            capProgress -= dt * 3.0
+        else:
+            capProgress -= dt * 1.0
+        capProgress = max(0.0, min(100.0, capProgress))
+        if capProgress >= 100.0:
+            capProgress = 0.0
+            fx({'k': 'captured', 'by': inP[0]['id']})
     sseq += 1
 
 # ---------------- события/рассылка ----------------
@@ -412,6 +437,9 @@ def stSnapshot():
     bs = [{'i': b['id'], 'x': round(b['x'], 1), 'y': round(b['y'], 1), 'z': round(b['z'], 1)}
           for b in bullets]
     gm = {'m': worldMode, 's': dict(duelScore), 'r': duelRound, 'w': duelWinner}
+    if worldMode == 'capture':
+        gm['p'] = round(capProgress, 1)
+        gm['cap'] = CAP
     return {'t': 'st', 'n': sseq, 'w': wave, 'gm': gm, 'pts': pts, 'bs': bs}
 
 async def send(ws, obj):
@@ -492,7 +520,7 @@ async def ws_send(writer, payload):
 
 # ---------------- клиенты ----------------
 async def handle(reader, writer):
-    global sseq, worldMode, duelScore, duelRound, duelWinner, duelEndT
+    global sseq, worldMode, duelScore, duelRound, duelWinner, duelEndT, capProgress
     ws = None
     try:
         key = await handshake(reader, writer)
@@ -529,6 +557,20 @@ async def handle(reader, writer):
                     worldMode = 'duel'
                     side = 0 if not any(u.get('side') == 0 for u in units if u['team'] == 'player') else 1
                     x, z, a = duelSpawn(side)
+                elif mode == 'capture':
+                    # захват базы: кооп, волны + зона у базы врага
+                    if worldMode == 'duel' and players:
+                        await send(ws, {'t': 'busy'}); continue
+                    worldMode = 'capture'
+                    x, z = ARENA_W / 2, ARENA_H / 2
+                    for _ in range(40):
+                        x = ARENA_W / 2 + random.uniform(-260, 260)
+                        z = ARENA_H / 2 + random.uniform(-200, 200)
+                        if not wallBlocking(x, z, TANK_R + 4) and not any(
+                                u is not (unit) and u['al'] and math.hypot(u['x'] - x, u['z'] - z) < TANK_R * 3
+                                for u in units if u['team'] == 'player'):
+                            break
+                    a = 0
                 else:
                     if worldMode == 'duel' and players:
                         await send(ws, {'t': 'busy'}); continue
@@ -591,6 +633,9 @@ async def handle(reader, writer):
         if worldMode == 'duel' and not any(u['team'] == 'player' for u in units):
             worldMode = 'coop'
             duelScore = {}; duelRound = 1; duelWinner = None; duelEndT = 0
+        if worldMode == 'capture' and not any(u['team'] == 'player' for u in units):
+            worldMode = 'coop'
+            capProgress = 0.0
         try:
             writer.close()
         except Exception:

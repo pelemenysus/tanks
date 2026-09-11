@@ -120,6 +120,12 @@
   }
   #hDuel:hover { background: #a85a4a; }
   #hDuel:disabled { opacity: 0.5; cursor: wait; }
+  #hCap {
+    width: 100%; padding: 10px 0; font-size: 15px; cursor: pointer; letter-spacing: 2px;
+    background: #3c6f4a; color: #d8f2dc; border: 2px solid #6ac87a; border-radius: 8px; margin-top: 8px;
+  }
+  #hCap:hover { background: #4a8a5a; }
+  #hCap:disabled { opacity: 0.5; cursor: wait; }
   .hNetRow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
   #hNetCfg { font-size: 11px; padding: 3px 8px; cursor: pointer; background: #33415c; color: #c8d8e8; border: 1px solid #5b7ea6; border-radius: 6px; white-space: nowrap; }
   #hNetCfg:hover { background: #41537a; }
@@ -163,6 +169,12 @@
   .dHp { font-size: 10px; color: #9a9780; }
   #duelScore { font-size: 22px; font-weight: bold; color: #ffd76e; min-width: 64px; }
   #duelMsg { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: 34px; font-weight: bold; color: #ffd76e; text-shadow: 0 3px 20px rgba(0,0,0,0.8); letter-spacing: 3px; text-align: center; z-index: 7; pointer-events: none; }
+  /* HUD захвата базы */
+  #capHud { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 380px; background: rgba(10,14,6,0.7); border: 1px solid rgba(110,200,122,0.5); border-radius: 10px; padding: 8px 14px 10px; text-align: center; z-index: 6; }
+  #capTitle { font-size: 12px; letter-spacing: 2px; color: #9ad8a6; margin-bottom: 6px; }
+  #capTrack { height: 12px; background: #1a1f14; border: 1px solid #4a5a30; border-radius: 5px; overflow: hidden; }
+  #capBar { height: 100%; width: 0%; background: linear-gradient(90deg, #e0b23f, #8fce4f); transition: width .15s; }
+  .capRow { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: #cfccb2; }
   .btn {
     margin-top: 10px; padding: 14px 44px; font-size: 20px; cursor: pointer;
     background: #6d8f3c; color: #f2f0dc; border: 2px solid #a5c86a; border-radius: 8px;
@@ -221,6 +233,11 @@
     </div>
   </div>
   <div id="duelMsg" class="hidden"></div>
+  <div id="capHud" class="hidden">
+    <div id="capTitle">🚩 ЗАХВАТ БАЗЫ</div>
+    <div id="capTrack"><div id="capBar"></div></div>
+    <div class="capRow"><span id="capStatus">—</span><span id="capPct">0%</span></div>
+  </div>
   <div class="panel" id="hint">W/S — ход • A/D — поворот • мышь — башня • ЛКМ/Пробел — огонь • P — пауза • R — в ангар • M — звук</div>
 </div>
 
@@ -267,6 +284,7 @@
         <button id="hGo">В БОЙ</button>
         <button id="hNet">🌐 СЕТЕВОЙ БОЙ</button>
         <button id="hDuel">⚔ ДУЭЛЬ 1×1</button>
+        <button id="hCap">🚩 ЗАХВАТ БАЗЫ</button>
         <div class="hNetRow"><button id="hNetCfg">⚙ адрес сервера</button><span id="netAddrHint" class="netAddrHint"></span></div>
       </div>
       <div class="hPanel narrow">
@@ -2166,6 +2184,7 @@ function netWantPending(mode) {
 }
 document.getElementById('hNet').addEventListener('click', () => netWant('coop'));
 document.getElementById('hDuel').addEventListener('click', () => netWant('duel'));
+document.getElementById('hCap').addEventListener('click', () => netWant('capture'));
 document.getElementById('hNetCfg').addEventListener('click', () => {
   _el('netHostInput').value = save.netHost || '';
   _el('netModal').classList.remove('hidden');
@@ -2837,6 +2856,9 @@ function netInit(d) {
   duelMsgT = 0;
   document.getElementById('duelMsg').classList.add('hidden');
   duelHudShow(net.gm.m === 'duel');
+  capHudShow(net.gm.m === 'capture');
+  if (net.gm.m === 'capture' && net.gm.cap) buildCapZone(net.gm.cap);
+  else removeCapZone();
   setMap(MAPS[0]);   // сервер шлёт холмы/стены — клиент строит по ним
   const base = VEHICLES[save.selected];
   const st = effStats(save.selected);
@@ -2848,8 +2870,8 @@ function netInit(d) {
   net.fireT = 0;
   score = 0; kills = 0; wave = 0; shake = 0; sessionEarned = 0; sessionGold = 0;
   document.getElementById('tankName').textContent =
-    (net.mode === 'duel' ? '⚔ ' : '🌐 ') + (base.premium ? '★ ' : '') + TYPE_LABELS[base.type] + ' ' + base.name;
-  document.getElementById('waveText').textContent = net.mode === 'duel' ? 'ДУЭЛЬ 1×1' : 'ВОЛНА ' + wave;
+    (net.mode === 'duel' ? '⚔ ' : net.mode === 'capture' ? '🚩 ' : '🌐 ') + (base.premium ? '★ ' : '') + TYPE_LABELS[base.type] + ' ' + base.name;
+  document.getElementById('waveText').textContent = net.mode === 'duel' ? 'ДУЭЛЬ 1×1' : net.mode === 'capture' ? 'ЗАХВАТ БАЗЫ' : 'ВОЛНА ' + wave;
 }
 
 function netLeave() {
@@ -2861,6 +2883,8 @@ function netLeave() {
   player = null;
   state = 'hangar';
   duelHudShow(false);
+  capHudShow(false);
+  removeCapZone();
   document.getElementById('duelMsg').classList.add('hidden');
   duelMsgT = 0;
   document.getElementById('gameover').classList.add('hidden');
@@ -2886,7 +2910,13 @@ function netApplySt(d) {
   if (!net || !net.ready) return;
   net.wave = d.w; wave = d.w;
   if (d.gm) net.gm = d.gm;
-  document.getElementById('waveText').textContent = net.gm.m === 'duel' ? 'ДУЭЛЬ 1×1' : 'ВОЛНА ' + d.w;
+  const m = net.gm.m;
+  document.getElementById('waveText').textContent = m === 'duel' ? 'ДУЭЛЬ 1×1' : m === 'capture' ? 'ЗАХВАТ БАЗЫ' : 'ВОЛНА ' + d.w;
+  if (m === 'capture') {
+    capHudUpdate(net.gm.p || 0);
+    if (net.gm.cap && (!capGroup || Math.abs(capGroup.position.x - net.gm.cap.x) > 1 || Math.abs(capGroup.position.z - net.gm.cap.z) > 1)) buildCapZone(net.gm.cap);
+    capZoneColor(net.gm.p || 0);
+  }
   let oppHp = null, oppMh = null;
   const seen = new Set();
   for (const p of d.pts) {
@@ -2980,6 +3010,65 @@ function duelMsg(text, sec) {
   duelMsgT = sec || 2.5;
 }
 
+/* ============ ЗАХВАТ БАЗЫ ============ */
+let capGroup = null;
+function capHudShow(on) {
+  document.getElementById('capHud').classList.toggle('hidden', !on);
+}
+function capHudUpdate(p) {
+  if (!net) return;
+  const pct = clamp(p || 0, 0, 100);
+  document.getElementById('capBar').style.width = pct + '%';
+  document.getElementById('capPct').textContent = Math.round(pct) + '%';
+  const st = document.getElementById('capStatus');
+  if (pct >= 100) st.textContent = 'БАЗА ЗАХВАЧЕНА!';
+  else if (pct > 0) st.textContent = 'Идёт захват — удерживайте зону!';
+  else st.textContent = 'Войдите в зону, чтобы захватить базу';
+}
+function buildCapZone(zone) {
+  removeCapZone();
+  const r = zone.r || 130;
+  capGroup = new THREE.Group();
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(r, 48),
+    new THREE.MeshBasicMaterial({ color: 0xffd76e, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })
+  );
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = 0.6;
+  capGroup.add(disc);
+  capGroup.userData.disc = disc;
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(r - 5, r, 48),
+    new THREE.MeshBasicMaterial({ color: 0xffd76e, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.8;
+  capGroup.add(ring);
+  // флаг на шесте
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 48, 8),
+    new THREE.MeshStandardMaterial({ color: 0x6a6e74, roughness: 0.6 }));
+  pole.position.y = 24;
+  capGroup.add(pole);
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(15, 9, 0.9),
+    new THREE.MeshStandardMaterial({ color: 0xd94a3f, roughness: 0.7 }));
+  flag.position.set(8.2, 42, 0);
+  capGroup.add(flag);
+  capGroup.userData.flag = flag;
+  capGroup.position.set(zone.x, 0, zone.z);
+  fxGroup.add(capGroup);
+}
+function removeCapZone() {
+  if (capGroup) { fxGroup.remove(capGroup); capGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.dispose) o.material.dispose(); }); capGroup = null; }
+}
+function capZoneColor(pct) {
+  if (!capGroup || !capGroup.userData.disc) return;
+  // жёлтый → зелёный по мере прогресса
+  const c = new THREE.Color().setHSL(0.13 * (1 - clamp(pct / 100, 0, 1)), 1, 0.5);
+  capGroup.userData.disc.material.color.copy(c);
+  capGroup.userData.disc.material.opacity = 0.18 + 0.15 * clamp(pct / 100, 0, 1);
+  capGroup.traverse(o => { if (o.isMesh && o.material && o.material.color && o.geometry && o.geometry.type === 'RingGeometry') o.material.color.copy(c); });
+}
+
 function fxMuzzleAt(x, y, z) {
   flashSprite.position.set(x, y, z); flashSprite.visible = true; flashT = 0.09;
   flashLight.position.set(x, y + 4, z); flashLight.intensity = 2;
@@ -3039,6 +3128,16 @@ function netApplyFx(items) {
     } else if (e.k === 'duelend') {
       if (e.winner === net.selfId) duelMsg('🏆 МАТЧ ЗА ВАМИ! ' + duelScoreText() + ' · НОВЫЙ МАТЧ', 6);
       else duelMsg('МАТЧ ЗА СОПЕРНИКОМ ' + duelScoreText() + ' · РЕВАНШ', 6);
+    } else if (e.k === 'captured') {
+      if (player) {
+        const premMul = player.cls.premium ? 1.5 : 1;
+        const c = Math.round(300 * premMul);
+        save.money += c; sessionEarned += c;
+        const g = player.cls.premium ? 2 : 1;
+        save.gold += g; sessionGold += g;
+        persistSave();
+        duelMsg('🚩 БАЗА ЗАХВАЧЕНА! +' + c + ' монет · +' + g + ' золота', 6);
+      }
     }
   }
 }
@@ -3241,9 +3340,10 @@ function drawHUD() {
     clipLabel.textContent = '';
   }
   const isDuelHud = net && net.gm && net.gm.m === 'duel';
-  document.getElementById('waveText').textContent = isDuelHud ? 'ДУЭЛЬ 1×1' : 'ВОЛНА ' + wave;
+  const isCapHud = net && net.gm && net.gm.m === 'capture';
+  document.getElementById('waveText').textContent = isDuelHud ? 'ДУЭЛЬ 1×1' : isCapHud ? 'ЗАХВАТ БАЗЫ' : 'ВОЛНА ' + wave;
   document.getElementById('scoreText').textContent = 'ОЧКИ: ' + score;
-  document.getElementById('killsText').textContent = isDuelHud ? 'РАУНД ' + (net.gm.r || 1) : 'УНИЧТОЖЕНО: ' + kills;
+  document.getElementById('killsText').textContent = isDuelHud ? 'РАУНД ' + (net.gm.r || 1) : (isCapHud ? 'ВОЛНА ' + wave : 'УНИЧТОЖЕНО: ' + kills);
   document.getElementById('alliesText').textContent = isDuelHud ? '' : ('СОЮЗНИКИ: ' + tanks.filter(t => t.team === 'ally').length + '/' + maxAllies());
   document.getElementById('moneyText').textContent = 'МОНЕТЫ: ' + save.money + '   •   ЗОЛОТО: ' + save.gold;
 
@@ -3251,6 +3351,14 @@ function drawHUD() {
   g.clearRect(0, 0, 190, 127);
   g.fillStyle = 'rgba(30,40,22,0.9)'; g.fillRect(0, 0, 190, 127);
   const sc = 190 / ARENA_W;
+  // зона захвата на миникарте
+  if (isCapHud && net.gm.cap) {
+    const czr = net.gm.cap.r * sc;
+    g.strokeStyle = '#ffd76e'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(net.gm.cap.x * sc, net.gm.cap.z * sc, Math.max(6, czr), 0, 6.28); g.stroke();
+    g.fillStyle = 'rgba(255,215,110,0.25)';
+    g.fill();
+  }
   for (const w of walls) {
     g.fillStyle = w.crate ? 'rgba(160,130,70,0.8)' : 'rgba(150,150,130,0.5)';
     g.fillRect(w.x * sc, w.y * sc, Math.max(2, w.w * sc), Math.max(2, w.h * sc));
