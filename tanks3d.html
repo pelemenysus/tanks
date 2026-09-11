@@ -1041,12 +1041,28 @@ function setMap(mp) {
   ground.material.map = groundTextureFor(mp);
   ground.material.needsUpdate = true;
   makeTerrain(mp);
+  makeApron(mp);
   makeWalls();
   makeScenery(mp);
   const R = Math.max(1700, Math.max(ARENA_W, ARENA_H) / 2 + 350);
   sun.shadow.camera.left = -R; sun.shadow.camera.right = R;
   sun.shadow.camera.top = R; sun.shadow.camera.bottom = -R;
   sun.shadow.camera.updateProjectionMatrix();
+}
+
+/* Подложка под ареной: закрывает пустоту за краями карты */
+let apron = null;
+function makeApron(mp) {
+  if (apron) { scene.remove(apron); apron.geometry.dispose(); apron.material.dispose(); }
+  const pad = 900;
+  apron = new THREE.Mesh(
+    new THREE.PlaneGeometry(ARENA_W + pad * 2, ARENA_H + pad * 2),
+    new THREE.MeshStandardMaterial({ color: mp.mid || mp.low, roughness: 1 })
+  );
+  apron.rotation.x = -Math.PI / 2;
+  apron.position.set(ARENA_W / 2, -0.5, ARENA_H / 2);
+  apron.receiveShadow = false;
+  scene.add(apron);
 }
 
 /* ============ ДЕКОРАЦИИ КАРТ ============ */
