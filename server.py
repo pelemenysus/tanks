@@ -103,9 +103,26 @@ def resolvePairs():
             if not a['al'] or not b['al']: continue
             d = math.hypot(b['x'] - a['x'], b['z'] - a['z'])
             if d < TANK_R * 2 and d > 0.001:
+                nx = (b['x'] - a['x']) / d; nz = (b['z'] - a['z']) / d
                 push = (TANK_R * 2 - d) / 2 / d
-                a['x'] -= (b['x'] - a['x']) * push; a['z'] -= (b['z'] - a['z']) * push
-                b['x'] += (b['x'] - a['x']) * push; b['z'] += (b['z'] - a['z']) * push
+                a['x'] -= nx * TANK_R * push; a['z'] -= nz * TANK_R * push
+                b['x'] += nx * TANK_R * push; b['z'] += nz * TANK_R * push
+                # урон от тарана в сетевом бою
+                av = (a.get('speedDriven') or 0) * math.cos(a['a']) - (a.get('speedDriven') or 0) * math.sin(a['a'])
+                relVx = (b.get('speedDriven') or 0) * math.cos(b['a']) - (a.get('speedDriven') or 0) * math.cos(a['a'])
+                relVz = (b.get('speedDriven') or 0) * math.sin(b['a']) - (a.get('speedDriven') or 0) * math.sin(a['a'])
+                vn = abs(relVx * nx + relVz * nz)
+                if vn > 95:
+                    attacker = b if abs(b.get('speedDriven') or 0) > abs(a.get('speedDriven') or 0) else a
+                    victim = a if attacker is b else b
+                    massT = {'heavy': 2.0, 'medium': 1.2, 'td': 1.0, 'light': 0.8}
+                    massK = massT.get(attacker['v']['type'], 1) / max(massT.get(victim['v']['type'], 1), 0.01)
+                    dmg = min((vn - 95) * 0.13 * max(0.4, min(2.0, massK)), victim['mh'] * 0.5)
+                    if dmg > 0.5 and attacker['team'] != victim['team']:
+                        damage(victim, dmg, (a['x'] + b['x']) / 2, 30, (a['z'] + b['z']) / 2, attacker['team'])
+                        damage(attacker, dmg * 0.25, (a['x'] + b['x']) / 2, 30, (a['z'] + b['z']) / 2, victim['team'])
+                    elif dmg > 0.5:
+                        damage(victim, dmg, (a['x'] + b['x']) / 2, 30, (a['z'] + b['z']) / 2, attacker['team'])
 
 # ---------------- состояние мира ----------------
 units = []       # игроки и враги: dict
@@ -599,11 +616,17 @@ async def handle(reader, writer):
                 fx({'k': 'wave', 'w': wave})
                 continue
             if tp == 'in' and unit:
+                dx = float(data.get('x', unit['x'])) - unit['x']
+                dz = float(data.get('z', unit['z'])) - unit['z']
                 unit['x'] = float(data.get('x', unit['x']))
                 unit['z'] = float(data.get('z', unit['z']))
                 unit['a'] = float(data.get('a', unit['a']))
                 unit['tu'] = float(data.get('tu', unit['tu']))
                 unit['el'] = float(data.get('el', unit['el']))
+                dist = math.hypot(dx, dz)
+                dt_est = max(0.02, unit.get('lastIn', 0)) if unit.get('lastIn') else 0.05
+                unit['speedDriven'] = dist / dt_est if dist > 1 else 0
+                unit['lastIn'] = 0.05
                 resolveTankWalls(unit)
                 if data.get('f') and unit['al'] and canFireT(unit):
                     fireDirect(unit, unit['el'])

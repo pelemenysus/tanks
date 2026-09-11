@@ -2300,9 +2300,28 @@ function resolveTankPairs() {
       if (!a.alive || !b.alive) continue;
       const d = Math.hypot(b.x - a.x, b.z - a.z);
       if (d < TANK_R * 2 && d > 0.001) {
+        const nx = (b.x - a.x) / d, nz = (b.z - a.z) / d;
         const push = (TANK_R * 2 - d) / 2 / d;
-        a.x -= (b.x - a.x) * push; a.z -= (b.z - a.z) * push;
-        b.x += (b.x - a.x) * push; b.z += (b.z - a.z) * push;
+        a.x -= nx * TANK_R * push; a.z -= nz * TANK_R * push;
+        b.x += nx * TANK_R * push; b.z += nz * TANK_R * push;
+        // урон от тарана: кинетическая энергия при быстром наезде
+        const relVx = (b.speedDriven || 0) * Math.cos(b.angle) - (a.speedDriven || 0) * Math.cos(a.angle);
+        const relVz = (b.speedDriven || 0) * Math.sin(b.angle) - (a.speedDriven || 0) * Math.sin(a.angle);
+        // проекция относительной скорости на нормаль столкновения
+        const vn = Math.abs(relVx * nx + relVz * nz);
+        if (vn > 95) {
+          const attacker = Math.abs(b.speedDriven || 0) > Math.abs(a.speedDriven || 0) ? b : a;
+          const victim = attacker === b ? a : b;
+          const massT = { heavy: 2.0, medium: 1.2, td: 1.0, light: 0.8 };
+          const massK = (massT[attacker.cls && attacker.cls.type] || 1) / (massT[victim.cls && victim.cls.type] || 1);
+          const dmg = Math.min((vn - 95) * 0.13 * clamp(massK, 0.4, 2.0), victim.maxHp * 0.5);
+          if (dmg > 0.5 && attacker.team !== victim.team) {
+            applyDamage(victim, dmg, (a.x + b.x) / 2, heightAt((a.x + b.x) / 2, (a.z + b.z) / 2) + 30, (a.z + b.z) / 2, attacker.team);
+            applyDamage(attacker, dmg * 0.25, (a.x + b.x) / 2, heightAt((a.x + b.x) / 2, (a.z + b.z) / 2) + 30, (a.z + b.z) / 2, victim.team);
+          } else if (dmg > 0.5) {
+            applyDamage(victim, dmg, (a.x + b.x) / 2, heightAt((a.x + b.x) / 2, (a.z + b.z) / 2) + 30, (a.z + b.z) / 2, attacker.team);
+          }
+        }
       }
     }
   }
@@ -2533,6 +2552,7 @@ function updateAI(t, dt) {
     let moved = false;
     if (!wallBlocking(sx, sz, TANK_R - 2)) { t.x = sx; t.z = sz; moved = true; }
     t.wheelVel = moved ? t.speed : 0;
+    t.speedDriven = moved ? t.speed : 0;
     resolveTankWalls(t);
     return;
   }
@@ -2608,12 +2628,13 @@ function update(dt) {
     const sp = player.speed * drive * dt;
     const nx = player.x + Math.cos(player.angle) * sp;
     const nz = player.z + Math.sin(player.angle) * sp;
-    if (!wallBlocking(nx, nz, TANK_R - 2)) { player.x = nx; player.z = nz; player.wheelVel = Math.abs(player.speed * drive); }
-    else player.wheelVel = 0;
+    if (!wallBlocking(nx, nz, TANK_R - 2)) { player.x = nx; player.z = nz; player.wheelVel = Math.abs(player.speed * drive); player.speedDriven = player.speed * drive; }
+    else { player.wheelVel = 0; player.speedDriven = 0; }
     if (Math.random() < dt * 3)
       addParticle('smoke', player.x - Math.cos(player.angle) * 24, heightAt(player.x, player.z) + 20, player.z - Math.sin(player.angle) * 24, 0, 8, 0, 0.5, 12, 6, 0x888888);
   } else {
     player.wheelVel *= Math.max(0, 1 - dt * 8);
+    player.speedDriven = 0;
   }
   resolveTankWalls(player);
 
