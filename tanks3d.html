@@ -114,6 +114,12 @@
   }
   #hNet:hover { background: #4a6fa8; }
   #hNet:disabled { opacity: 0.5; cursor: wait; }
+  #hDuel {
+    width: 100%; padding: 10px 0; font-size: 15px; cursor: pointer; letter-spacing: 2px;
+    background: #8f4a3c; color: #f2dcd8; border: 2px solid #c87a6a; border-radius: 8px; margin-top: 8px;
+  }
+  #hDuel:hover { background: #a85a4a; }
+  #hDuel:disabled { opacity: 0.5; cursor: wait; }
   .hNetRow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
   #hNetCfg { font-size: 11px; padding: 3px 8px; cursor: pointer; background: #33415c; color: #c8d8e8; border: 1px solid #5b7ea6; border-radius: 6px; white-space: nowrap; }
   #hNetCfg:hover { background: #41537a; }
@@ -144,6 +150,19 @@
   #minimapWrap { right: 16px; top: 118px; background: rgba(10,14,6,0.65); border: 1px solid rgba(140,180,90,0.35); border-radius: 8px; padding: 4px; }
   canvas#minimap { display: block; width: 190px; height: 127px; }
   #hint { left: 0; right: 0; bottom: 10px; text-align: center; font-size: 12px; color: rgba(220,220,200,0.5); }
+  /* Дуэльный HUD сверху по центру */
+  #duelHud { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 420px; background: rgba(10,14,6,0.7); border: 1px solid rgba(200,120,90,0.5); border-radius: 10px; padding: 8px 14px 10px; text-align: center; z-index: 6; }
+  #duelTitle { font-size: 12px; letter-spacing: 2px; color: #e8a890; margin-bottom: 6px; }
+  .dRow { display: flex; align-items: center; gap: 10px; }
+  .dSide { flex: 1; text-align: left; }
+  .dSide.right { text-align: right; }
+  .dLbl { font-size: 11px; color: #cfccb2; letter-spacing: 1px; }
+  .dTrack { height: 9px; background: #1a1f14; border: 1px solid #4a5a30; border-radius: 4px; overflow: hidden; margin: 3px 0 2px; }
+  .dFill { height: 100%; width: 100%; background: #8fce4f; transition: width .15s; }
+  .dFill.opp { background: #e0553f; }
+  .dHp { font-size: 10px; color: #9a9780; }
+  #duelScore { font-size: 22px; font-weight: bold; color: #ffd76e; min-width: 64px; }
+  #duelMsg { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: 34px; font-weight: bold; color: #ffd76e; text-shadow: 0 3px 20px rgba(0,0,0,0.8); letter-spacing: 3px; text-align: center; z-index: 7; pointer-events: none; }
   .btn {
     margin-top: 10px; padding: 14px 44px; font-size: 20px; cursor: pointer;
     background: #6d8f3c; color: #f2f0dc; border: 2px solid #a5c86a; border-radius: 8px;
@@ -187,6 +206,21 @@
   </div>
   <div class="panel" id="moneyText">МОНЕТЫ: 0</div>
   <div class="panel" id="minimapWrap"><canvas id="minimap" width="190" height="127"></canvas></div>
+  <div id="duelHud" class="hidden">
+    <div id="duelTitle">⚔ ДУЭЛЬ · РАУНД 1</div>
+    <div class="dRow">
+      <div class="dSide"><span class="dLbl">ВЫ</span>
+        <div class="dTrack"><div class="dFill" id="duelMyHp"></div></div>
+        <div class="dHp" id="duelMyHpNum"></div>
+      </div>
+      <div id="duelScore">0 : 0</div>
+      <div class="dSide right"><span class="dLbl">СОПЕРНИК</span>
+        <div class="dTrack"><div class="dFill opp" id="duelOpHp"></div></div>
+        <div class="dHp" id="duelOpHpNum"></div>
+      </div>
+    </div>
+  </div>
+  <div id="duelMsg" class="hidden"></div>
   <div class="panel" id="hint">W/S — ход • A/D — поворот • мышь — башня • ЛКМ/Пробел — огонь • P — пауза • R — в ангар • M — звук</div>
 </div>
 
@@ -232,6 +266,7 @@
         </div>
         <button id="hGo">В БОЙ</button>
         <button id="hNet">🌐 СЕТЕВОЙ БОЙ</button>
+        <button id="hDuel">⚔ ДУЭЛЬ 1×1</button>
         <div class="hNetRow"><button id="hNetCfg">⚙ адрес сервера</button><span id="netAddrHint" class="netAddrHint"></span></div>
       </div>
       <div class="hPanel narrow">
@@ -804,74 +839,22 @@ ground.position.set(ARENA_W / 2, 0, ARENA_H / 2);
 ground.receiveShadow = true;
 scene.add(ground);
 
-/* ============ РЕЛЬЕФ ============ */
-let terrainHills = [];
+/* ============ РЕЛЬЕФ (ровная земля, без холмов) ============ */
 let groundHeights = null;      // сетка высот меша (97x65), строится в makeTerrain
 const GROUND_SX = 96, GROUND_SZ = 64;
-function heightAt(x, z) {
-  let h = 0;
-  for (let i = 0; i < terrainHills.length; i++) {
-    const hl = terrainHills[i];
-    const dx = x - hl.x, dz = z - hl.z;
-    const q = (dx * dx + dz * dz) / (hl.r * hl.r);
-    if (q < 9) h += hl.h * Math.exp(-q);
-  }
-  // лёгкая неровность
-  h += Math.sin(x * 0.011 + 2.1) * Math.cos(z * 0.009 + 1.3) * 3.5;
-  // плавный спуск к краям арены
-  const m = Math.min(x, z, ARENA_W - x, ARENA_H - z);
-  if (m < 190) {
-    const t = Math.max(0, m / 190);
-    h *= t * t * (3 - 2 * t);
-  }
-  // ровная площадка в центре (ангар/спавн): гасим холмы в радиусе 150
-  const dxc = x - ARENA_W / 2, dzc = z - ARENA_H / 2;
-  const qc = Math.sqrt(dxc * dxc + dzc * dzc) / 150;
-  if (qc < 1) h *= qc * qc * (3 - 2 * qc);
-  return h;
-}
+function heightAt(x, z) { return 0; }
 function makeTerrain(mp) {
   mp = mp || curMap;
-  terrainHills = [];
-  if (net && net.map && net.map.hills) {
-    for (const h of net.map.hills) terrainHills.push({ x: h.x, z: h.z, r: h.r, h: h.h });
-  } else {
-  const areaF = Math.max(1, (ARENA_W * ARENA_H) / (2400 * 1600));
-  const nBig = Math.max(9, Math.round(13 * areaF));
-  const nSteep = Math.max(3, Math.round(4 * areaF));
-  for (let i = 0; i < nBig; i++) {
-    terrainHills.push({
-      x: rand(280, ARENA_W - 280),
-      z: rand(200, ARENA_H - 200),
-      r: rand(200, 460),
-      h: rand(26, 72) * (Math.random() < 0.72 ? 1 : -1)
-    });
-  }
-  for (let i = 0; i < nSteep; i++) {
-    terrainHills.push({
-      x: rand(420, ARENA_W - 420),
-      z: rand(320, ARENA_H - 320),
-      r: rand(130, 210),
-      h: rand(45, 85) * (Math.random() < 0.6 ? 1 : -1)
-    });
-  }
-  }
   const pos = ground.geometry.attributes.position;
   groundHeights = new Float32Array((GROUND_SX + 1) * (GROUND_SZ + 1));
-  // сетка PlaneGeometry: 97 вершин по X, 65 по Z; индексы: ix + iz*97
   const colors = new Float32Array(pos.count * 3);
-  const cLow = new THREE.Color(mp.low), cMid = new THREE.Color(mp.mid), cHigh = new THREE.Color(mp.high);
+  const cLow = new THREE.Color(mp.low);
   for (let iz = 0; iz <= GROUND_SZ; iz++) {
     for (let ix = 0; ix <= GROUND_SX; ix++) {
       const i = iz * (GROUND_SX + 1) + ix;
-      const lx = pos.getX(i), ly = pos.getY(i);   // после поворота -PI/2: мир x = ARENA_W/2+lx, z = ARENA_H/2-ly
-      const mx = ARENA_W / 2 + lx, mz = ARENA_H / 2 - ly;
-      const h = heightAt(mx, mz);
-      pos.setZ(i, h);
-      groundHeights[i] = h;
-      const t = h < 25 ? 0 : h > 90 ? 1 : (h - 25) / 65;
-      const c = t < 0.5 ? cLow.clone().lerp(cMid, t * 2) : cMid.clone().lerp(cHigh, (t - 0.5) * 2);
-      colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+      pos.setZ(i, 0);
+      groundHeights[i] = 0;
+      colors[i * 3] = cLow.r; colors[i * 3 + 1] = cLow.g; colors[i * 3 + 2] = cLow.b;
     }
   }
   pos.needsUpdate = true;
@@ -2157,6 +2140,7 @@ function spawnAllies() {
 }
 document.getElementById('hGo').addEventListener('click', startGame);
 /* Сетевой бой: адрес сервера настраивается (свой комп или хост друга) */
+let pendingNetMode = 'coop';
 function netAddr() {
   const h = (save.netHost || '').trim();
   if (h) return h;
@@ -2168,13 +2152,20 @@ function netAddrHint() {
   const a = netAddr();
   document.getElementById('netAddrHint').textContent = a ? ('сервер: ' + a) : 'укажите адрес сервера ⚙';
 }
-document.getElementById('hNet').addEventListener('click', () => {
-  const a = netAddr();
-  if (a) { netStart(); return; }
+function netWant(mode) {
+  if (net) return;
+  pendingNetMode = mode;
+  if (netAddr()) { netStart(); return; }
   _el('netHostInput').value = save.netHost || '';
   _el('netModal').classList.remove('hidden');
   _el('netHostInput').focus();
-});
+}
+function netWantPending(mode) {
+  // адрес появился после сохранения — стартуем с запрошенным режимом
+  setTimeout(() => netStart(mode), 30);
+}
+document.getElementById('hNet').addEventListener('click', () => netWant('coop'));
+document.getElementById('hDuel').addEventListener('click', () => netWant('duel'));
 document.getElementById('hNetCfg').addEventListener('click', () => {
   _el('netHostInput').value = save.netHost || '';
   _el('netModal').classList.remove('hidden');
@@ -2186,8 +2177,12 @@ document.getElementById('netCfgOk').addEventListener('click', () => {
   persistSave();
   _el('netModal').classList.add('hidden');
   netAddrHint();
+  if (pendingNetMode !== null && v && !net) netStart(pendingNetMode);
 });
-document.getElementById('netCfgCancel').addEventListener('click', () => _el('netModal').classList.add('hidden'));
+document.getElementById('netCfgCancel').addEventListener('click', () => {
+  _el('netModal').classList.add('hidden');
+  pendingNetMode = null;
+});
 document.getElementById('netHostInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('netCfgOk').click();
 });
@@ -2791,27 +2786,30 @@ function spawnEnemy(m) {
 }
 
 /* ============ СЕТЕВОЙ БОЙ ============ */
-function netStart() {
+function netStart(mode) {
   if (net) return;
   ensureAudio();
+  pendingNetMode = mode || pendingNetMode || 'coop';
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const addr = netAddr();
-  if (!addr) return;   // поле адреса пустое — уже показано окно ввода
+  if (!addr) { netWantPending(pendingNetMode); return; }   // адрес пустой — окно ввода
   const ws = new WebSocket(proto + '://' + addr);
-  net = { ws, selfId: null, units: {}, bMeshes: {}, inAcc: 0, wave: 0, ready: false, fireT: 0, left: false };
+  net = { ws, mode: pendingNetMode || 'coop', selfId: null, units: {}, bMeshes: {}, inAcc: 0, wave: 0, ready: false, fireT: 0, left: false, gm: null };
   state = 'net';
   document.getElementById('hangar').style.display = 'none';
   document.getElementById('gameover').classList.add('hidden');
   document.getElementById('pause').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
-  document.getElementById('tankName').textContent = 'СЕТЕВОЙ БОЙ: подключение…';
+  document.getElementById('tankName').textContent = (net.mode === 'duel' ? '⚔ ДУЭЛЬ 1×1' : '🌐 СЕТЕВОЙ БОЙ') + ': подключение…';
   document.getElementById('waveText').textContent = 'ПОДКЛЮЧЕНИЕ…';
-  ws.onopen = () => { try { ws.send(JSON.stringify({ t: 'join', veh: save.selected })); } catch (e) {} };
+  ws.onopen = () => { try { ws.send(JSON.stringify({ t: 'join', veh: save.selected, mode: net.mode })); } catch (e) {} };
   ws.onmessage = ev => {
     let d; try { d = JSON.parse(ev.data); } catch (e) { return; }
     if (d.t === 'init') netInit(d);
     else if (d.t === 'st') netApplySt(d);
     else if (d.t === 'fxs') netApplyFx(d.items);
+    else if (d.t === 'full') { netLeave(); showModal('Дуэль 1×1', 'На сервере уже идёт дуэль: оба места заняты. Попробуйте позже.'); }
+    else if (d.t === 'busy') { netLeave(); showModal('Сетевая игра', 'На сервере уже идёт игра в другом режиме. Попросите хозяина перезапустить server.py.'); }
   };
   ws.onclose = () => {
     if (net && !net.left) {
@@ -2829,12 +2827,16 @@ function netInit(d) {
   if (!net) return;
   net.selfId = d.self;
   net.map = d.map;
+  net.gm = d.gm || { m: net.mode, s: {}, r: 1, w: null };
   net.ready = true;
   while (tanksGroup.children.length) tanksGroup.remove(tanksGroup.children[0]);
   while (fxGroup.children.length) { const c = fxGroup.children[0]; if (c.material && c.material.dispose) c.material.dispose(); fxGroup.remove(c); }
   fxGroup.add(flashSprite);
   tanks = []; bullets = []; particles = []; decals = [];
   net.units = {}; net.bMeshes = {};
+  duelMsgT = 0;
+  document.getElementById('duelMsg').classList.add('hidden');
+  duelHudShow(net.gm.m === 'duel');
   setMap(MAPS[0]);   // сервер шлёт холмы/стены — клиент строит по ним
   const base = VEHICLES[save.selected];
   const st = effStats(save.selected);
@@ -2846,8 +2848,8 @@ function netInit(d) {
   net.fireT = 0;
   score = 0; kills = 0; wave = 0; shake = 0; sessionEarned = 0; sessionGold = 0;
   document.getElementById('tankName').textContent =
-    '🌐 ' + (base.premium ? '★ ' : '') + TYPE_LABELS[base.type] + ' ' + base.name;
-  document.getElementById('waveText').textContent = 'ВОЛНА ' + wave;
+    (net.mode === 'duel' ? '⚔ ' : '🌐 ') + (base.premium ? '★ ' : '') + TYPE_LABELS[base.type] + ' ' + base.name;
+  document.getElementById('waveText').textContent = net.mode === 'duel' ? 'ДУЭЛЬ 1×1' : 'ВОЛНА ' + wave;
 }
 
 function netLeave() {
@@ -2858,6 +2860,9 @@ function netLeave() {
   tanks = []; bullets = []; particles = []; decals = [];
   player = null;
   state = 'hangar';
+  duelHudShow(false);
+  document.getElementById('duelMsg').classList.add('hidden');
+  duelMsgT = 0;
   document.getElementById('gameover').classList.add('hidden');
   document.getElementById('pause').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -2880,7 +2885,9 @@ function netSendIn(f) {
 function netApplySt(d) {
   if (!net || !net.ready) return;
   net.wave = d.w; wave = d.w;
-  document.getElementById('waveText').textContent = 'ВОЛНА ' + d.w;
+  if (d.gm) net.gm = d.gm;
+  document.getElementById('waveText').textContent = net.gm.m === 'duel' ? 'ДУЭЛЬ 1×1' : 'ВОЛНА ' + d.w;
+  let oppHp = null, oppMh = null;
   const seen = new Set();
   for (const p of d.pts) {
     seen.add(p.i);
@@ -2898,7 +2905,8 @@ function netApplySt(d) {
     }
     let t = net.units[p.i];
     if (!t) {
-      t = makeTank(p.x, p.z, p.tm === 'enemy' ? 'enemy' : 'ally', p.v, {});
+      const isDuelOpp = net.gm.m === 'duel';
+      t = makeTank(p.x, p.z, isDuelOpp ? 'enemy' : (p.tm === 'enemy' ? 'enemy' : 'ally'), p.v, {});
       t.netId = p.i;
       if (t.team === 'enemy') t.discovered = true;   // в сети все видны
       net.units[p.i] = t;
@@ -2907,6 +2915,7 @@ function netApplySt(d) {
     t.hp = p.h; t.maxHp = p.mh; t.alive = p.al;
     t.model.group.visible = p.al;
     if (t.barBg) { t.barBg.visible = t.barFg.visible = p.al; }
+    if (net.gm.m === 'duel') { oppHp = p.h; oppMh = p.mh; }
   }
   for (const id in net.units) {
     if (!seen.has(id)) {
@@ -2936,6 +2945,39 @@ function netApplySt(d) {
       delete net.bMeshes[id];
     }
   }
+  if (net.gm.m === 'duel') duelHudUpdate(oppHp, oppMh);
+}
+
+/* ============ HUD ДУЭЛИ ============ */
+let duelMsgT = 0;
+function duelHudShow(on) {
+  document.getElementById('duelHud').classList.toggle('hidden', !on);
+}
+function duelDuelScore() {
+  const s = net && net.gm ? net.gm.s : {};
+  const my = net ? (s[net.selfId] || 0) : 0;
+  let opp = 0;
+  if (net) for (const id in s) if (id !== net.selfId) opp = s[id];
+  return my + ' : ' + opp;
+}
+function duelHudUpdate(oppHp, oppMh) {
+  if (!net || !player) return;
+  const g = net.gm;
+  document.getElementById('duelTitle').textContent = '⚔ ДУЭЛЬ 1×1 · РАУНД ' + g.r + (g.w ? ' · МАТЧ ОКОНЧЕН' : '');
+  document.getElementById('duelScore').textContent = duelDuelScore();
+  const myF = player.maxHp ? clamp(player.hp / player.maxHp, 0, 1) : 0;
+  document.getElementById('duelMyHp').style.width = (100 * myF) + '%';
+  document.getElementById('duelMyHpNum').textContent = Math.max(0, Math.round(player.hp)) + ' / ' + player.maxHp;
+  if (oppHp != null && oppMh) {
+    document.getElementById('duelOpHp').style.width = (100 * clamp(oppHp / oppMh, 0, 1)) + '%';
+    document.getElementById('duelOpHpNum').textContent = Math.max(0, Math.round(oppHp)) + ' / ' + oppMh;
+  }
+}
+function duelMsg(text, sec) {
+  const el = document.getElementById('duelMsg');
+  el.textContent = text;
+  el.classList.remove('hidden');
+  duelMsgT = sec || 2.5;
 }
 
 function fxMuzzleAt(x, y, z) {
@@ -2948,6 +2990,7 @@ function netApplyFx(items) {
   for (const e of items) {
     if (e.k === 'wave') {
       wave = e.w;
+      if (net.gm && net.gm.m === 'duel') continue;   // в дуэли волн нет — только счёт
       document.getElementById('waveText').textContent = 'ВОЛНА ' + e.w;
       if (e.w > 1) {
         score += 50;
@@ -2980,13 +3023,30 @@ function netApplyFx(items) {
     } else if (e.k === 'dead') {
       if (e.i === net.selfId) {
         document.getElementById('overTitle').textContent = 'ВЫ ПОДБИТЫ!';
-        document.getElementById('overStats').textContent = 'Возрождение через несколько секунд…';
+        document.getElementById('overStats').textContent = net.gm.m === 'duel' ? 'Соперник берёт очко. Возрождение через несколько секунд…' : 'Возрождение через несколько секунд…';
         document.getElementById('gameover').classList.remove('hidden');
       }
     } else if (e.k === 'respawn') {
       if (e.i === net.selfId) document.getElementById('gameover').classList.add('hidden');
+    } else if (e.k === 'rwin') {
+      if (e.winner === net.selfId) {
+        duelMsg('РАУНД ЗА ВАМИ!', 2.5);
+        if (player) sfxShot(0);
+      } else {
+        duelMsg('РАУНД ЗА СОПЕРНИКОМ', 2.5);
+      }
+      duelHudUpdate(null, null);
+    } else if (e.k === 'duelend') {
+      if (e.winner === net.selfId) duelMsg('🏆 МАТЧ ЗА ВАМИ! ' + duelScoreText() + ' · НОВЫЙ МАТЧ', 6);
+      else duelMsg('МАТЧ ЗА СОПЕРНИКОМ ' + duelScoreText() + ' · РЕВАНШ', 6);
     }
   }
+}
+function duelScoreText() {
+  const s = net && net.gm ? net.gm.s : {};
+  let my = 0, opp = 0;
+  if (net) for (const id in s) { if (id === net.selfId) my = s[id]; else opp = s[id]; }
+  return my + ':' + opp;
 }
 
 function updateNetFx(dt) {
@@ -3017,6 +3077,11 @@ function updateNetFx(dt) {
   if (flashT > 0) { flashT -= dt; flashSprite.material.opacity = clamp(flashT / 0.09, 0, 1) * 0.95; if (flashT <= 0) flashSprite.visible = false; }
   flashLight.intensity *= Math.pow(0.001, dt);
   if (flashLight.intensity < 0.05) flashLight.intensity = 0;
+  // баннер дуэли
+  if (duelMsgT > 0) {
+    duelMsgT -= dt;
+    if (duelMsgT <= 0) { duelMsgT = 0; document.getElementById('duelMsg').classList.add('hidden'); }
+  }
   if (player) {
     const off = clamp(angNorm(player.turret - player.angle) * 0.35, -0.4, 0.4);
     camYaw = angLerp(camYaw, player.angle + off, dt * 2.5);
@@ -3175,10 +3240,11 @@ function drawHUD() {
     clipTrack.classList.add('hidden');
     clipLabel.textContent = '';
   }
-  document.getElementById('waveText').textContent = 'ВОЛНА ' + wave;
+  const isDuelHud = net && net.gm && net.gm.m === 'duel';
+  document.getElementById('waveText').textContent = isDuelHud ? 'ДУЭЛЬ 1×1' : 'ВОЛНА ' + wave;
   document.getElementById('scoreText').textContent = 'ОЧКИ: ' + score;
-  document.getElementById('killsText').textContent = 'УНИЧТОЖЕНО: ' + kills;
-  document.getElementById('alliesText').textContent = 'СОЮЗНИКИ: ' + tanks.filter(t => t.team === 'ally').length + '/' + maxAllies();
+  document.getElementById('killsText').textContent = isDuelHud ? 'РАУНД ' + (net.gm.r || 1) : 'УНИЧТОЖЕНО: ' + kills;
+  document.getElementById('alliesText').textContent = isDuelHud ? '' : ('СОЮЗНИКИ: ' + tanks.filter(t => t.team === 'ally').length + '/' + maxAllies());
   document.getElementById('moneyText').textContent = 'МОНЕТЫ: ' + save.money + '   •   ЗОЛОТО: ' + save.gold;
 
   const g = mmCtx;
